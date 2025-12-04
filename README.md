@@ -1,4 +1,4 @@
-# 🔐 Proyek AES dengan S-Box Custom Terbaik
+# 🔐 Proyek AES dengan S-Box Custom
 
 ## Deskripsi
 Proyek ini menguji Sbox dengan berbagai **properti kriptografi** untuk menentukan S-box terbaik, dan memungkinkan pengguna melakukan **enkripsi dan dekripsi AES** menggunakan S-box tersebut.
