@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AES S-box Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+body{font-family:Orbitron,sans-serif;background:linear-gradient(135deg,#0f172a,#1e293b,#0f172a);background-attachment:fixed;min-height:100vh}
+.mono{font-family:'JetBrains Mono',monospace}
+.hidden{display:none!important}
+.loader-overlay{position:fixed;inset:0;background:rgba(15,23,42,.98);backdrop-filter:blur(10px);z-index:9999;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s}
+.loader-overlay.active{opacity:1;pointer-events:all}
+.spinner{width:80px;height:80px;border:4px solid rgba(99,102,241,.2);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:24px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{color:#fff;font-size:18px;font-weight:600;animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.5}}
+.progress-bar{transition:width 1.2s cubic-bezier(.4,0,.2,1)}
+.glass-card{background:rgba(255,255,255,.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.tab-button{transition:all .3s}
+.tab-button.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}
+.sbox-grid{display:grid;grid-template-columns:auto repeat(16,minmax(40px,1fr));gap:1px;background:rgba(99,102,241,.1);border:2px solid rgba(99,102,241,.3);border-radius:8px;overflow:hidden}
+.sbox-header,.sbox-row-label{background:rgba(99,102,241,.3);padding:8px;text-align:center;font-weight:700;color:#818cf8;font-size:12px}
+.sbox-cell{background:rgba(30,41,59,.8);padding:8px 4px;text-align:center;transition:all .2s;cursor:pointer;font-size:13px;color:#94a3b8;position:relative}
+.sbox-cell:hover{background:rgba(99,102,241,.4);color:#fff;transform:scale(1.05);z-index:10;box-shadow:0 0 20px rgba(99,102,241,.6)}
+.sbox-cell:hover::after{content:attr(data-tooltip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.9);color:#fff;padding:4px 8px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:100}
+.comparison-table table{width:100%;border-collapse:separate;border-spacing:0}
+.comparison-table th{background:rgba(99,102,241,.2);padding:12px;font-weight:700;color:#818cf8;border-bottom:2px solid rgba(99,102,241,.3);position:sticky;top:0;z-index:5}
+.comparison-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);color:#cbd5e1;transition:background .2s}
+.comparison-table tr:hover td{background:rgba(99,102,241,.1)}
+.metric-name{font-weight:600;color:#e2e8f0}
+.best-value{background:rgba(34,197,94,.2)!important;font-weight:700;color:#4ade80!important;border:1px solid rgba(34,197,94,.3)}
+.overall-row{background:rgba(99,102,241,.15);font-weight:700;border-top:2px solid rgba(99,102,241,.4)!important}
+.format-btn{transition:all .3s;border:2px solid transparent}
+.format-btn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-color:#818cf8;box-shadow:0 0 20px rgba(99,102,241,.4)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:5px}
+::-webkit-scrollbar-thumb{background:rgba(99,102,241,.5);border-radius:5px}
+    </style>
+</head>
+<body class="py-8 px-4">
+<div id="loader" class="loader-overlay"><div class="text-center"><div class="spinner"></div><div class="loader-text">Computing metrics...</div></div></div>
+<div class="max-w-7xl mx-auto mb-8"><h1 class="text-5xl font-bold text-center mb-3 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AES S-BOX ANALYSIS</h1><p class="text-center text-gray-400 text-lg">Cryptographic Evaluation Suite</p></div>
+<div class="max-w-7xl mx-auto mb-6"><div class="glass-card rounded-xl p-2 flex gap-2"><button class="tab-button active px-6 py-3 rounded-lg font-semibold flex-1" onclick="switchTab('encryption',this)">🔐 Encryption</button><button class="tab-button px-6 py-3 rounded-lg font-semibold flex-1" onclick="switchTab('comparison',this)">📊 Comparison</button><button class="tab-button px-6 py-3 rounded-lg font-semibold flex-1" onclick="switchTab('viewer',this)">🔍 Viewer</button></div></div>
+<div class="max-w-7xl mx-auto">
+<div id="tab-encryption" class="tab-content">
+<form method="POST" class="glass-card rounded-xl p-8 space-y-6" onsubmit="showLoader()">
+<div><label class="block mb-3 font-semibold text-gray-200 text-lg">Select S-box:</label><select name="sbox_choice" id="sbox_select" class="bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 w-full text-gray-200 focus:ring-2 focus:ring-indigo-500"><option value="K44" {% if sbox_choice=='K44' %}selected{% endif %}>K44</option><option value="A0" {% if sbox_choice=='A0' %}selected{% endif %}>A0</option><option value="A1" {% if sbox_choice=='A1' %}selected{% endif %}>A1</option><option value="A2" {% if sbox_choice=='A2' %}selected{% endif %}>A2</option><option value="AES" {% if sbox_choice=='AES' %}selected{% endif %}>AES</option><option value="RANDOM" {% if sbox_choice=='RANDOM' %}selected{% endif %}>Random</option><option value="CUSTOM" {% if sbox_choice=='CUSTOM' %}selected{% endif %}>Custom</option></select></div>
+<div id="custom-sbox-section" class="{% if sbox_choice != 'CUSTOM' %}hidden{% endif %}"><label class="block mb-3 font-semibold text-gray-200 text-lg">Custom S-box (256 values):</label><textarea name="custom_sbox" class="mono bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 w-full h-32 text-gray-200 text-sm">{{ custom_sbox }}</textarea><p class="text-gray-400 text-sm mt-2">Format: 0,1,2,... or 0x00,0x01,... (256 unique values 0-255)</p></div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div><label class="block mb-3 font-semibold text-gray-200">Plaintext (16 bytes hex):</label><input type="text" name="plaintext" value="{{ plaintext }}" placeholder="000102030405060708090a0b0c0d0e0f" class="mono bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 w-full text-gray-200"></div><div><label class="block mb-3 font-semibold text-gray-200">Key (16 bytes hex):</label><input type="text" name="key" value="{{ key }}" placeholder="000102030405060708090a0b0c0d0e0f" class="mono bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 w-full text-gray-200"></div></div>
+<div class="flex flex-wrap gap-3"><button type="submit" name="action" value="Encrypt" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition">🔒 Encrypt</button><button type="submit" name="action" value="Decrypt" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg font-semibold transition">🔓 Decrypt</button><button type="submit" name="action" value="Download S-Box CSV" class="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-semibold transition">💾 CSV</button><button type="submit" name="action" value="Recalculate All Metrics" class="bg-gradient-to-r from-yellow-600 to-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition">🔄 Recalc</button></div>
+</form>
+{% if result %}<div class="glass-card rounded-xl p-6 mt-6"><h2 class="text-xl font-bold mb-4 text-gray-200">Result:</h2><div class="mono bg-slate-900 rounded-lg p-4 break-all text-green-400 text-sm border border-green-500/30">{{ result }}</div></div>{% endif %}
+{% if metrics %}<div class="glass-card rounded-xl p-6 mt-6"><h2 class="text-2xl font-bold text-gray-200 mb-6">Metrics{% if from_cache %} (cached){% endif %}</h2><div class="space-y-5">{% for key,value in metrics.items() %}<div><div class="flex justify-between mb-2"><span class="font-semibold text-gray-200">{{ key }}</span><span class="mono text-indigo-400 font-bold">{{ value }}</span></div><div class="w-full bg-slate-800 rounded-full h-3 overflow-hidden"><div class="progress-bar h-3 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" data-width="{{ calculate_progress_width(key,value)|int }}"></div></div></div>{% endfor %}</div></div>{% endif %}
+</div>
+<div id="tab-comparison" class="tab-content hidden">
+<div class="glass-card rounded-xl p-8"><div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-200">S-box Comparison</h2><button onclick="loadComparison()" class="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition">📊 Load</button></div><div id="comparison-container" class="comparison-table overflow-x-auto"><p class="text-gray-400 text-center py-8">Click Load to compare all S-boxes...</p></div></div>
+</div>
+<div id="tab-viewer" class="tab-content hidden">
+<div class="glass-card rounded-xl p-8"><h2 class="text-2xl font-bold mb-6 text-gray-200">S-box Inspector</h2><div class="flex flex-wrap gap-4 mb-6 items-end"><div class="flex-1 min-w-[250px]"><label class="block mb-3 font-semibold text-gray-200">Select S-box:</label><select id="viewer-sbox-select" onchange="loadSboxData()" class="bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 w-full text-gray-200"><option value="">-- Select --</option><option value="K44">K44</option><option value="A0">A0</option><option value="A1">A1</option><option value="A2">A2</option><option value="AES">AES</option></select></div><div class="flex gap-3"><button onclick="showFormat('hex')" id="btn-hex" class="format-btn active px-6 py-3 rounded-lg text-white font-semibold">HEX</button><button onclick="showFormat('dec')" id="btn-dec" class="format-btn bg-slate-700 px-6 py-3 rounded-lg text-gray-300 font-semibold">DEC</button></div></div><div id="sbox-display" class="text-gray-400 text-center py-8">Select an S-box to view...</div></div>
+</div>
+</div>
+<script>
+function switchTab(t,b){document.querySelectorAll('.tab-content').forEach(e=>e.classList.add('hidden'));document.querySelectorAll('.tab-button').forEach(e=>e.classList.remove('active'));document.getElementById('tab-'+t).classList.remove('hidden');b.classList.add('active')}
+document.getElementById('sbox_select')?.addEventListener('change',function(){const e=document.getElementById('custom-sbox-section');this.value==='CUSTOM'?e.classList.remove('hidden'):e.classList.add('hidden')});
+function showLoader(){document.getElementById('loader').classList.add('active')}
+function hideLoader(){document.getElementById('loader').classList.remove('active')}
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('.progress-bar').forEach((b,i)=>{const w=b.dataset.width;b.style.width='0%';setTimeout(()=>b.style.width=w+'%',100+i*50)})});
+async function loadComparison(){showLoader();try{const r=await fetch('/api/compare-sboxes'),d=await r.json();if(d.error)throw new Error(d.error);const n=Object.keys(d);if(!n.length)throw new Error('No data');const m=Object.keys(d[n[0]].metrics);let h='<table class="w-full"><thead><tr><th class="text-left px-4 py-3">Metric</th>';n.forEach(s=>h+=`<th class="text-center px-4 py-3">${s}</th>`);h+='</tr></thead><tbody>';m.forEach(metric=>{h+='<tr><td class="metric-name px-4 py-3">'+metric+'</td>';const v=[];n.forEach(s=>v.push({n:s,v:d[s].metrics[metric]}));let best=null;if(metric==='Balance'||metric==='Bijective')best=true;else if(metric==='NL'||metric==='BIC-NL'||metric==='SAC'||metric==='BIC-SAC')best=Math.max(...v.map(x=>parseFloat(x.v)||0));else if(metric==='LAP'||metric==='DAP')best=Math.min(...v.map(x=>parseFloat(x.v)||Infinity));v.forEach(({n,v})=>{const isBest=(metric==='Balance'||metric==='Bijective')?v===true:(metric==='LAP'||metric==='DAP')?parseFloat(v)===best:parseFloat(v)===best;h+=`<td class="text-center mono ${isBest?'best-value':''}">${v}</td>`});h+='</tr>'});h+='<tr class="overall-row"><td class="px-4 py-3">Overall Score</td>';const bs=Math.max(...n.map(s=>d[s].overall_score||0));n.forEach(s=>{const sc=d[s].overall_score||0;h+=`<td class="text-center font-bold ${sc===bs?'best-value':''}">${sc.toFixed(2)}</td>`});h+='</tr></tbody></table>';document.getElementById('comparison-container').innerHTML=h}catch(e){console.error(e);document.getElementById('comparison-container').innerHTML='<div class="text-red-400 text-center py-8"><p class="text-xl font-bold mb-2">⚠️ Error</p><p>'+e.message+'</p></div>'}finally{hideLoader()}}
+let currentSboxData=null,currentFormat='hex';
+async function loadSboxData(){const n=document.getElementById('viewer-sbox-select').value;if(!n)return;showLoader();try{const r=await fetch(`/api/sbox-data/${n}`),d=await r.json();if(d.error)throw new Error(d.error);currentSboxData=d;displaySboxData()}catch(e){console.error(e);document.getElementById('sbox-display').innerHTML='<div class="text-red-400 text-center py-8"><p class="text-xl font-bold mb-2">⚠️ Error</p><p>'+e.message+'</p></div>'}finally{hideLoader()}}
+function showFormat(f){currentFormat=f;const hb=document.getElementById('btn-hex'),db=document.getElementById('btn-dec');f==='hex'?(hb.classList.add('active'),db.classList.remove('active')):(db.classList.add('active'),hb.classList.remove('active'));currentSboxData&&displaySboxData()}
+function displaySboxData(){if(!currentSboxData||!currentSboxData[currentFormat]){document.getElementById('sbox-display').innerHTML='<p class="text-gray-400 text-center py-8">No data</p>';return}const d=currentSboxData[currentFormat],n=currentSboxData.name||'S-box';let h='<div class="sbox-grid mono"><div class="sbox-header"></div>';for(let i=0;i<16;i++)h+=`<div class="sbox-header">${i.toString(16).toUpperCase()}</div>`;for(let r=0;r<16;r++){h+=`<div class="sbox-row-label">${r.toString(16).toUpperCase()}</div>`;for(let c=0;c<16;c++){const v=d[r][c],p=`[${r.toString(16).toUpperCase()}][${c.toString(16).toUpperCase()}]`,t=`${p} = ${v}`;h+=`<div class="sbox-cell" data-tooltip="${t}">${v}</div>`}}h+=`</div><div class="text-center text-gray-400 mt-4 text-sm">S-box: ${n} | Format: ${currentFormat.toUpperCase()} | 256 values</div>`;document.getElementById('sbox-display').innerHTML=h}
+</script>
+</body>
+</html>

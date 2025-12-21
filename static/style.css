@@ -1,0 +1,23 @@
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  padding: 20px;
+}
+
+table td {
+  border: 1px solid #334155;
+  padding: 4px;
+  font-size: 12px;
+}
+
+button {
+  background: #38bdf8;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+button:hover {
+  transform: scale(1.05);
+}
