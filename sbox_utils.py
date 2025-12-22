@@ -216,7 +216,7 @@ def dap(s):
         maxv = max(maxv, np.max(np.bincount(dy)))
     return maxv / 256
 
-def bic_sac(s):
+def bic_sac_fast(s):
     idx = np.arange(256)
     total = count = 0
     for i in range(8):
@@ -229,7 +229,7 @@ def bic_sac(s):
             count += bi.size
     return total / count
 
-def bic_nl(s):
+def bic_nl_fast(s):
     bits = ((s[:,None] >> np.arange(8)) & 1)
     max_bias = 0
     for i in range(8):
@@ -255,8 +255,8 @@ if __name__ == "__main__":
             "SAC": sac(s),
             "LAP": lap(s),
             "DAP": dap(s),
-            "BIC-SAC": bic_sac(s),
-            "BIC-NL": float(bic_nl(s))
+            "BIC-SAC": bic_sac_fast(s),
+            "BIC-NL": float(bic_nl_fast(s))
         }
 
         results.append(res)
@@ -269,3 +269,4 @@ if __name__ == "__main__":
         json.dump(results, f, indent=4)
 
     print("\n✅ Semua hasil disimpan ke all_sbox_results.json")
+
