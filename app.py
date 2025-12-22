@@ -1,3 +1,4 @@
+import warnings
 import streamlit as st
 import io
 import csv
@@ -7,6 +8,13 @@ import hashlib
 import json
 import pandas as pd
 from pathlib import Path
+import logging
+import time
+# Suppress WebSocket warnings
+logging.getLogger('tornado.access').setLevel(logging.ERROR)
+logging.getLogger('tornado.application').setLevel(logging.ERROR)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+
 
 from sbox_utils import (
     generate_sboxes, balance, bijective, nonlinearity,
@@ -834,6 +842,7 @@ elif page == "🖼️ Image S-Box Comparison":
     image_comparison_page(sboxes)
 
 # Page: S-Box Comparison
+# In S-Box Comparison page
 elif page == "📊 S-Box Comparison":
     st.header("S-Box Comparison")
     
@@ -841,150 +850,154 @@ elif page == "📊 S-Box Comparison":
     with col1:
         st.write("Compare cryptographic metrics across all S-boxes")
     with col2:
-        if st.button("🔄 Recalculate All", key="recalc_all"):
-            with st.spinner("Recalculating all S-boxes..."):
-                sboxes = generate_sboxes(include_random=False)
-                progress_bar = st.progress(0)
-                total = len(sboxes)
+        # Add selectbox for recalculation mode
+        recalc_mode = st.selectbox(
+            "Recalculate Mode",
+            ["Single S-Box", "Batch (3 at once)", "All at once"],
+            help="Choose calculation mode to prevent timeout"
+        )
+    
+    # === SINGLE S-BOX RECALCULATION ===
+    if recalc_mode == "Single S-Box":
+        st.subheader("🔄 Recalculate Single S-Box")
+        
+        sboxes = generate_sboxes(include_random=False)
+        selected_sbox = st.selectbox(
+            "Select S-Box to recalculate",
+            list(sboxes.keys())
+        )
+        
+        col1, col2, col3 = st.columns([2, 2, 1])
+        
+        with col1:
+            if st.button("🔄 Recalculate Selected", key="recalc_single", width='stretch'):
+                with st.spinner(f"⏳ Calculating metrics for {selected_sbox}..."):
+                    sbox = sboxes[selected_sbox]
+                    
+                    # Progress indicator
+                    progress_text = st.empty()
+                    
+                    progress_text.text("📊 Running 8 cryptographic tests...")
+                    
+                    start_time = time.time()
+                    metrics, _ = sbox_metrics(sbox, sbox_name=selected_sbox, force_recalculate=True)
+                    elapsed = time.time() - start_time
+                    
+                    save_metrics_to_file()
+                    
+                    progress_text.empty()
+                    st.success(f"✅ Recalculated {selected_sbox} in {elapsed:.1f}s")
+                    st.balloons()
+                    st.rerun()
+        
+        with col2:
+            if st.button("🔄 Recalculate All Text S-Boxes", key="recalc_text"):
+                text_sboxes = {k: v for k, v in sboxes.items() if not k.startswith("IMG-")}
+                st.info(f"⏳ Processing {len(text_sboxes)} text S-boxes...")
                 
-                for idx, (name, sbox) in enumerate(sboxes.items()):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                for idx, (name, sbox) in enumerate(text_sboxes.items()):
+                    status_text.text(f"Processing: {name} ({idx+1}/{len(text_sboxes)})")
                     metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=True)
-                    progress_bar.progress((idx + 1) / total)
+                    progress_bar.progress((idx + 1) / len(text_sboxes))
                 
                 save_metrics_to_file()
-                st.success(f"✅ Recalculated {total} S-boxes!")
+                st.success(f"✅ Recalculated {len(text_sboxes)} text S-boxes!")
+                st.rerun()
+        
+        with col3:
+            st.caption("💡 Prevents timeout")
+    
+    # === BATCH RECALCULATION ===
+    elif recalc_mode == "Batch (3 at once)":
+        st.subheader("📦 Batch Recalculation")
+        st.info("💡 Process 3 S-boxes at a time to prevent timeout")
+        
+        sboxes = generate_sboxes(include_random=False)
+        sbox_list = list(sboxes.items())
+        
+        # Calculate batches
+        batch_size = 3
+        total_batches = (len(sbox_list) + batch_size - 1) // batch_size
+        
+        if 'current_batch' not in st.session_state:
+            st.session_state.current_batch = 0
+        
+        # Show progress
+        st.progress(st.session_state.current_batch / total_batches)
+        st.write(f"**Progress:** Batch {st.session_state.current_batch}/{total_batches}")
+        
+        if st.session_state.current_batch < total_batches:
+            # Get current batch
+            start_idx = st.session_state.current_batch * batch_size
+            end_idx = min(start_idx + batch_size, len(sbox_list))
+            current_batch = dict(sbox_list[start_idx:end_idx])
+            
+            st.write(f"**Next batch:** {', '.join(current_batch.keys())}")
+            
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                if st.button("▶️ Process Next Batch", key="process_batch", width='stretch'):
+                    with st.spinner(f"Processing batch {st.session_state.current_batch + 1}..."):
+                        progress_bar = st.progress(0)
+                        
+                        for idx, (name, sbox) in enumerate(current_batch.items()):
+                            st.text(f"Calculating: {name}...")
+                            metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=True)
+                            progress_bar.progress((idx + 1) / len(current_batch))
+                        
+                        save_metrics_to_file()
+                        st.session_state.current_batch += 1
+                        st.success(f"✅ Batch {st.session_state.current_batch} complete!")
+                        st.rerun()
+            
+            with col2:
+                if st.button("⏭️ Skip to Results", key="skip_batch"):
+                    st.session_state.current_batch = total_batches
+                    st.rerun()
+        else:
+            st.success("🎉 All batches processed!")
+            if st.button("🔄 Reset and Restart"):
+                st.session_state.current_batch = 0
                 st.rerun()
     
-    # Calculate comparison data
-    sboxes = generate_sboxes(include_random=False)
-    comparison_data = {}
-    
-    for name, sbox in sboxes.items():
-        metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=False)
+    # === ALL AT ONCE (Original behavior) ===
+    else:
+        st.subheader("⚡ Recalculate All")
+        st.warning("⚠️ This may take 60-120 seconds. Browser may show 'not responding' - this is normal!")
         
-        scores = []
-        for key, value in metrics.items():
-            if key not in ["Balance", "Bijective"]:
-                scores.append(get_metric_score(key, value))
-        
-        overall_score = sum(scores) / len(scores) if scores else 0
-        
-        comparison_data[name] = {
-            'metrics': metrics,
-            'overall_score': round(overall_score, 2)
-        }
-    
-    # Display statistics
-    std_metrics = calculate_std_metrics(sboxes)
-    
-    st.subheader("📈 Statistical Summary")
-    stats_df = pd.DataFrame(std_metrics).T
-    st.dataframe(stats_df.style.format("{:.6f}"), use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Display comparison table
-    st.subheader("🔢 Detailed Comparison")
-    
-    # Build comparison dataframe
-    comparison_rows = []
-    for name, data in comparison_data.items():
-        row = {'S-Box': name, 'Overall Score': data['overall_score']}
-        row.update(data['metrics'])
-        comparison_rows.append(row)
-    
-    df = pd.DataFrame(comparison_rows)
-    df = df.sort_values('Overall Score', ascending=False)
-    
-    # Format and display
-    st.dataframe(df.style.format({
-        'Overall Score': '{:.2f}',
-        'NL': '{:.2f}',
-        'SAC': '{:.4f}',
-        'LAP': '{:.6f}',
-        'DAP': '{:.6f}',
-        'BIC-SAC': '{:.4f}',
-        'BIC-NL': '{:.2f}'
-    }), use_container_width=True)
-    
-    st.markdown("---")
-    
-    # Individual S-box comparison
-    st.subheader("🔍 Individual S-Box Analysis")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        selected_sboxes = st.multiselect(
-            "Select S-Boxes to Compare (select 2 or more)",
-            options=list(sboxes.keys()),
-            default=list(sboxes.keys())[:2] if len(sboxes) >= 2 else list(sboxes.keys())
-        )
-    
-    if len(selected_sboxes) >= 2:
-        # Create detailed comparison for selected S-boxes
-        st.write(f"**Comparing {len(selected_sboxes)} S-Boxes:**")
-        
-        # Prepare data for comparison
-        comparison_detail = []
-        for name in selected_sboxes:
-            if name in comparison_data:
-                comparison_detail.append({
-                    'S-Box': name,
-                    **comparison_data[name]['metrics'],
-                    'Overall Score': comparison_data[name]['overall_score']
-                })
-        
-        df_selected = pd.DataFrame(comparison_detail)
-        
-        # Display as styled table
-        st.dataframe(df_selected.style.format({
-            'Overall Score': '{:.2f}',
-            'NL': '{:.2f}',
-            'SAC': '{:.4f}',
-            'LAP': '{:.6f}',
-            'DAP': '{:.6f}',
-            'BIC-SAC': '{:.4f}',
-            'BIC-NL': '{:.2f}'
-        }), use_container_width=True)
-        
-        # Visualization for selected S-boxes
-        st.subheader("📊 Metric Comparison Chart")
-        
-        # Prepare data for chart (non-boolean metrics only)
-        chart_metrics = ['NL', 'SAC', 'LAP', 'DAP', 'BIC-SAC', 'BIC-NL']
-        
-        for metric in chart_metrics:
-            if metric in df_selected.columns:
-                chart_data = df_selected[['S-Box', metric]].set_index('S-Box')
-                st.write(f"**{metric}**")
-                st.bar_chart(chart_data)
-        
-        # Download selected comparison
-        csv_buffer_selected = io.StringIO()
-        df_selected.to_csv(csv_buffer_selected, index=False)
-        st.download_button(
-            label=f"⬇️ Download Selected Comparison ({len(selected_sboxes)} S-Boxes)",
-            data=csv_buffer_selected.getvalue(),
-            file_name=f"sbox_comparison_selected_{len(selected_sboxes)}.csv",
-            mime="text/csv",
-            key="download_selected"
-        )
-    elif len(selected_sboxes) == 1:
-        st.info("Please select at least 2 S-boxes for comparison")
-    
-    st.markdown("---")
-    
-    # Download all comparison
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    st.download_button(
-        label=f"⬇️ Download All Comparison ({len(df)} S-Boxes)",
-        data=csv_buffer.getvalue(),
-        file_name="sbox_comparison_all.csv",
-        mime="text/csv",
-        key="download_all"
-    )
-
+        if st.button("🔄 Recalculate All S-Boxes", key="recalc_all"):
+            sboxes = generate_sboxes(include_random=False)
+            total = len(sboxes)
+            
+            st.info(f"⏳ Processing {total} S-boxes... Please wait...")
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            time_text = st.empty()
+            
+            start_time = time.time()
+            
+            for idx, (name, sbox) in enumerate(sboxes.items()):
+                status_text.text(f"⏳ Calculating: {name} ({idx+1}/{total})")
+                
+                metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=True)
+                
+                progress_bar.progress((idx + 1) / total)
+                
+                elapsed = time.time() - start_time
+                eta = (elapsed / (idx + 1)) * (total - idx - 1) if idx > 0 else 0
+                time_text.text(f"⏱️ Elapsed: {elapsed:.1f}s | ETA: {eta:.1f}s")
+            
+            save_metrics_to_file()
+            
+            total_time = time.time() - start_time
+            st.success(f"✅ Recalculated {total} S-boxes in {total_time:.1f}s!")
+            st.balloons()
+            st.rerun()
 # Page: S-Box Testing
 elif page == "🔬 S-Box Testing":
     st.header("S-Box Quality Testing")
@@ -1187,7 +1200,8 @@ elif page == "🔍 S-Box Viewer":
             file_name=f"{sbox_name.replace('📝 ', '').replace('🖼️ ', '')}_sbox_{display_format.lower()}.csv",
             mime="text/csv",
             key="download_csv",
-            use_container_width=True
+            width='stretch'  # or width='stretch' for latest Streamlit
+
         )
     
     with col2:

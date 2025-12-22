@@ -1,16 +1,29 @@
-[theme]
-primaryColor = "#667eea"
-backgroundColor = "#0f0c29"
-secondaryBackgroundColor = "#24243e"
-textColor = "#ffffff"
-font = "sans serif"
-
 [server]
-headless = true
-port = 8501
+# Increase timeout limits
+maxUploadSize = 200
+maxMessageSize = 200
 enableCORS = false
 enableXsrfProtection = true
-maxUploadSize = 200
+
+# Prevent premature timeout
+runOnSave = false
+fileWatcherType = "none"
 
 [browser]
 gatherUsageStats = false
+serverAddress = "0.0.0.0"
+serverPort = 8501
+
+# Browser timeout settings
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true
+
+[runner]
+# Allow long-running calculations
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+
+# IMPORTANT: Increase execution timeout
+fastReruns = true
