@@ -17,10 +17,17 @@ warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
 from sbox_utils import (
-    generate_sboxes, balance, bijective, nonlinearity,
-    sac, lap, dap, bic_sac_fast, bic_nl_fast,
-    show_test_process, compare_with_ideal
+    generate_sboxes,
+    balance,
+    bijective,
+    nonlinearity,
+    sac,
+    lap,
+    dap,
+    bic_sac_fast,
+    bic_nl_fast 
 )
+
 
 from crypto import AESCustom
 
@@ -1546,106 +1553,37 @@ elif page == "📊 S-Box Comparison":
             st.warning("⚠️ No statistics available.")
             st.info("💡 Please calculate S-box metrics first in the 'Recalculate Metrics' tab.")
 # Page: S-Box Testing
+# ================= Page: S-Box Testing =================
 elif page == "🔬 S-Box Testing":
-    st.header("S-Box Quality Testing")
-    
+    st.header("🔬 S-Box Quality Testing")
+
+    # Generate once only
     sboxes = generate_sboxes(include_random=False)
-    sbox_name = st.selectbox("Select S-Box for Testing", list(sboxes.keys()))
-    
+
+    sbox_name = st.selectbox(
+        "Select S-Box for Testing",
+        list(sboxes.keys())
+    )
+
     if st.button("🧪 Run Detailed Test"):
         with st.spinner(f"Testing {sbox_name}..."):
-            sbox = sboxes[sbox_name]
-            
-            # Run detailed test
-            results = show_test_process(sbox_name, sbox, verbose=False)
-            
-            # Convert numpy types
-            results_native = {}
-            for key, value in results.items():
-                if isinstance(value, (np.integer, np.floating)):
-                    results_native[key] = float(value)
-                elif isinstance(value, np.bool_):
-                    results_native[key] = bool(value)
-                else:
-                    results_native[key] = value
-            
-            # Calculate quality scores
-            ideals = {
-                'Balance': (True, 'boolean'),
-                'Bijective': (True, 'boolean'),
-                'NL': (112, 'higher'),
-                'SAC': (0.5, 'closer'),
-                'LAP': (0.0625, 'lower_equal'),
-                'DAP': (0.015625, 'lower_equal'),
-                'BIC-SAC': (0.5, 'closer'),
-                'BIC-NL': (112, 'higher')
+            s = sboxes[sbox_name]
+
+            result = {
+                "S-box": sbox_name,
+                "Balance": balance(s),
+                "Bijective": bijective(s),
+                "NL": nonlinearity(s),
+                "SAC": sac(s),
+                "LAP": lap(s),
+                "DAP": dap(s),
+                "BIC-SAC": bic_sac_fast(s),
+                "BIC-NL": bic_nl_fast(s)
             }
-            
-            quality_scores = {}
-            scores = []
-            
-            for metric, (ideal, comparison_type) in ideals.items():
-                value = results_native[metric]
-                
-                if comparison_type == 'boolean':
-                    score = 100 if value == ideal else 0
-                    status = "Pass" if value == ideal else "Fail"
-                elif comparison_type == 'higher':
-                    score = min(100, (value / ideal) * 100) if ideal > 0 else 0
-                    status = "Excellent" if value >= ideal else "Good" if value >= ideal * 0.9 else "Needs Improvement"
-                elif comparison_type == 'closer':
-                    deviation = abs(value - ideal)
-                    score = max(0, 100 - (deviation * 1000))
-                    status = "Excellent" if deviation < 0.01 else "Good" if deviation < 0.02 else "Needs Improvement"
-                elif comparison_type == 'lower_equal':
-                    if value <= ideal:
-                        score = 100
-                        status = "Excellent"
-                    else:
-                        score = max(0, 100 - ((value - ideal) / ideal * 100))
-                        status = "Acceptable" if value <= ideal * 1.2 else "Needs Improvement"
-                
-                quality_scores[metric] = {
-                    'value': value,
-                    'ideal': ideal,
-                    'score': score,
-                    'status': status
-                }
-                scores.append(score)
-            
-            overall_score = sum(scores) / len(scores) if scores else 0
-            
-            if overall_score >= 90:
-                grade = "A+"
-            elif overall_score >= 80:
-                grade = "A"
-            elif overall_score >= 70:
-                grade = "B"
-            elif overall_score >= 60:
-                grade = "C"
-            else:
-                grade = "D"
-            
-            # Display results
-            st.success(f"Overall Score: **{overall_score:.2f}** | Grade: **{grade}**")
-            
-            st.subheader("Quality Assessment")
-            
-            for metric, data in quality_scores.items():
-                col1, col2, col3 = st.columns([2, 2, 1])
-                with col1:
-                    st.write(f"**{metric}**")
-                with col2:
-                    st.write(f"Value: {data['value']} | Ideal: {data['ideal']}")
-                with col3:
-                    if data['status'] == "Excellent" or data['status'] == "Pass":
-                        st.success(data['status'])
-                    elif data['status'] == "Good":
-                        st.info(data['status'])
-                    else:
-                        st.warning(data['status'])
-                
-                st.progress(data['score'] / 100)
+
+        st.success("✅ Test completed")
+        st.json(result)
+
 
 # Page: Statistics
 elif page == "📈 Statistics":
