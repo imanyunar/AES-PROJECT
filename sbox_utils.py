@@ -59,6 +59,18 @@ A2 = np.array([
 [1,1,0,1,0,0,1,1]
 ], dtype=np.uint8)
 
+# K4 from paper (Table 4)
+K4 = np.array([
+[0,0,0,0,0,1,1,1],
+[1,0,0,0,0,0,1,1],
+[1,1,0,0,0,0,0,1],
+[1,1,1,0,0,0,0,0],
+[0,1,1,1,0,0,0,0],
+[0,0,1,1,1,0,0,0],
+[0,0,0,1,1,1,0,0],
+[0,0,0,0,1,1,1,1]
+], dtype=np.uint8)
+
 K44 = np.array([
 [0,1,0,1,0,1,1,1],
 [1,0,1,0,1,0,1,1],
@@ -68,6 +80,18 @@ K44 = np.array([
 [1,0,1,1,1,0,1,0],
 [0,1,0,1,1,1,0,1],
 [1,0,1,0,1,1,1,0]
+], dtype=np.uint8)
+
+# K128 from paper (Table 8)
+K128 = np.array([
+[1,1,1,1,1,1,1,0],
+[0,1,1,1,1,1,1,1],
+[1,0,1,1,1,1,1,1],
+[1,1,0,1,1,1,1,1],
+[1,1,1,0,1,1,1,1],
+[1,1,1,1,0,1,1,1],
+[1,1,1,1,1,0,1,1],
+[1,1,1,1,1,1,0,1]
 ], dtype=np.uint8)
 
 # ================= CONSTRUCT SBOX =================
@@ -85,7 +109,9 @@ def generate_sboxes(include_random=True, seed=None):
         "A0": construct_sbox(A0),
         "A1": construct_sbox(A1),
         "A2": construct_sbox(A2),
-        "K44": construct_sbox(K44)
+        "K4": construct_sbox(K4),
+        "K44": construct_sbox(K44),
+        "K128": construct_sbox(K128)
     }
     AES_SBOX = np.array([
         0x63,0x7c,0x77,0x7b,0xf2,0x6b,0x6f,0xc5,0x30,0x01,0x67,0x2b,0xfe,0xd7,0xab,0x76,
@@ -199,17 +225,279 @@ def save_results_csv(results, filename="sbox_results.csv"):
             writer.writerow(r)
 
 def save_results_json(results, filename="sbox_results.json"):
+    # Convert numpy types to Python native types
+    def convert_to_native(obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: convert_to_native(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_to_native(item) for item in obj]
+        return obj
+    
+    results_native = convert_to_native(results)
     with open(filename, "w") as f:
-        json.dump(results, f, indent=4)
+        json.dump(results_native, f, indent=4)
+
+# ================= DETAILED TEST PROCESS =================
+def show_test_process(name, s, verbose=True):
+    """Show detailed testing process for an S-box"""
+    if verbose:
+        print(f"\n{'='*80}")
+        print(f"TESTING S-BOX: {name}")
+        print(f"{'='*80}\n")
+    
+    results = {}
+    
+    # Test 1: Balance
+    if verbose:
+        print("📊 [1/8] Testing BALANCE...")
+        print("   → Checking if each output bit has equal 0s and 1s (128 each)")
+    balance_result = balance(s)
+    results['Balance'] = balance_result
+    if verbose:
+        status = "✅ PASS" if balance_result else "❌ FAIL"
+        print(f"   Result: {status} - {balance_result}\n")
+    
+    # Test 2: Bijective
+    if verbose:
+        print("🔄 [2/8] Testing BIJECTIVE...")
+        print("   → Checking if all 256 values are unique (one-to-one mapping)")
+        print(f"   Unique values: {len(set(s))}/256")
+    bijective_result = bijective(s)
+    results['Bijective'] = bijective_result
+    if verbose:
+        status = "✅ PASS" if bijective_result else "❌ FAIL"
+        print(f"   Result: {status} - {bijective_result}\n")
+    
+    # Test 3: Nonlinearity (NL)
+    if verbose:
+        print("📈 [3/8] Testing NONLINEARITY (NL)...")
+        print("   → Computing minimum Hamming distance from affine functions")
+        print("   → Iterating through 65,025 combinations (255 x 255)...")
+    nl_result = nonlinearity(s)
+    results['NL'] = nl_result
+    if verbose:
+        print(f"   Result: {nl_result} (Ideal: 112, Max: 120)")
+        quality = "Excellent" if nl_result >= 112 else "Good" if nl_result >= 104 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Test 4: Strict Avalanche Criterion (SAC)
+    if verbose:
+        print("🌊 [4/8] Testing STRICT AVALANCHE CRITERION (SAC)...")
+        print("   → Testing avalanche effect: 1-bit input change affects output")
+        print("   → Computing for 256 inputs x 8 bit positions = 2,048 tests")
+    sac_result = sac(s)
+    results['SAC'] = sac_result
+    if verbose:
+        deviation = abs(0.5 - sac_result)
+        print(f"   Result: {sac_result:.6f} (Ideal: 0.5)")
+        print(f"   Deviation from ideal: {deviation:.6f}")
+        quality = "Excellent" if deviation < 0.01 else "Good" if deviation < 0.02 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Test 5: Linear Approximation Probability (LAP)
+    if verbose:
+        print("🔍 [5/8] Testing LINEAR APPROXIMATION PROBABILITY (LAP)...")
+        print("   → Measuring resistance to linear cryptanalysis")
+        print("   → Testing 65,025 linear approximations...")
+    lap_result = lap(s)
+    results['LAP'] = lap_result
+    if verbose:
+        print(f"   Result: {lap_result:.6f} (Lower is better, Ideal: 0.0625)")
+        quality = "Excellent" if lap_result <= 0.0625 else "Good" if lap_result <= 0.075 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Test 6: Differential Approximation Probability (DAP)
+    if verbose:
+        print("🎯 [6/8] Testing DIFFERENTIAL APPROXIMATION PROBABILITY (DAP)...")
+        print("   → Measuring resistance to differential cryptanalysis")
+        print("   → Building differential distribution table (256x256)...")
+    dap_result = dap(s)
+    results['DAP'] = dap_result
+    if verbose:
+        print(f"   Result: {dap_result:.6f} (Lower is better, Ideal: ≤ 0.015625)")
+        quality = "Excellent" if dap_result <= 0.015625 else "Good" if dap_result <= 0.02 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Test 7: BIC-SAC
+    if verbose:
+        print("🔗 [7/8] Testing BIT INDEPENDENCE - SAC (BIC-SAC)...")
+        print("   → Testing independence between output bit changes")
+        print("   → Analyzing 28 bit pairs (8 choose 2)...")
+    bic_sac_result = bic_sac_fast(s)
+    results['BIC-SAC'] = bic_sac_result
+    if verbose:
+        deviation = abs(0.5 - bic_sac_result)
+        print(f"   Result: {bic_sac_result:.6f} (Ideal: 0.5)")
+        print(f"   Deviation from ideal: {deviation:.6f}")
+        quality = "Excellent" if deviation < 0.01 else "Good" if deviation < 0.02 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Test 8: BIC-NL
+    if verbose:
+        print("🧩 [8/8] Testing BIT INDEPENDENCE - NONLINEARITY (BIC-NL)...")
+        print("   → Testing nonlinearity between output bit pairs")
+        print("   → Computing for all bit pair combinations...")
+    bic_nl_result = bic_nl_fast(s)
+    results['BIC-NL'] = bic_nl_result
+    if verbose:
+        print(f"   Result: {bic_nl_result} (Ideal: 112, Max: 120)")
+        quality = "Excellent" if bic_nl_result >= 112 else "Good" if bic_nl_result >= 104 else "Moderate"
+        print(f"   Quality: {quality}\n")
+    
+    # Summary
+    if verbose:
+        print(f"{'='*80}")
+        print(f"SUMMARY FOR S-BOX: {name}")
+        print(f"{'='*80}")
+        print(f"Balance:   {results['Balance']}")
+        print(f"Bijective: {results['Bijective']}")
+        print(f"NL:        {results['NL']}")
+        print(f"SAC:       {results['SAC']:.6f}")
+        print(f"LAP:       {results['LAP']:.6f}")
+        print(f"DAP:       {results['DAP']:.6f}")
+        print(f"BIC-SAC:   {results['BIC-SAC']:.6f}")
+        print(f"BIC-NL:    {results['BIC-NL']}")
+        print(f"{'='*80}\n")
+    
+    return results
+
+def compare_with_ideal(results):
+    """Compare results with ideal values and show quality assessment"""
+    print("\n" + "="*80)
+    print("QUALITY ASSESSMENT (Comparison with Ideal Values)")
+    print("="*80)
+    
+    # Define ideal values and scoring
+    ideals = {
+        'Balance': (True, 'boolean'),
+        'Bijective': (True, 'boolean'),
+        'NL': (112, 'higher'),
+        'SAC': (0.5, 'closer'),
+        'LAP': (0.0625, 'lower_equal'),
+        'DAP': (0.015625, 'lower_equal'),
+        'BIC-SAC': (0.5, 'closer'),
+        'BIC-NL': (112, 'higher')
+    }
+    
+    scores = []
+    
+    for metric, (ideal, comparison_type) in ideals.items():
+        value = results[metric]
+        
+        if comparison_type == 'boolean':
+            score = 100 if value == ideal else 0
+            status = "✅ PASS" if value == ideal else "❌ FAIL"
+            detail = f"{value}"
+        
+        elif comparison_type == 'higher':
+            score = min(100, (value / ideal) * 100) if ideal > 0 else 0
+            status = "✅ Excellent" if value >= ideal else "⚠️ Good" if value >= ideal * 0.9 else "❌ Needs Improvement"
+            detail = f"{value} / {ideal}"
+        
+        elif comparison_type == 'closer':
+            deviation = abs(value - ideal)
+            score = max(0, 100 - (deviation * 1000))  # Penalize deviation
+            status = "✅ Excellent" if deviation < 0.01 else "⚠️ Good" if deviation < 0.02 else "❌ Needs Improvement"
+            detail = f"{value:.6f} (Ideal: {ideal}, Deviation: {deviation:.6f})"
+        
+        elif comparison_type == 'lower_equal':
+            if value <= ideal:
+                score = 100
+                status = "✅ Excellent"
+            else:
+                score = max(0, 100 - ((value - ideal) / ideal * 100))
+                status = "⚠️ Acceptable" if value <= ideal * 1.2 else "❌ Needs Improvement"
+            detail = f"{value:.6f} (Ideal: ≤ {ideal})"
+        
+        scores.append(score)
+        print(f"{metric:12} {status:20} {detail}")
+    
+    overall_score = sum(scores) / len(scores)
+    print(f"\n{'='*80}")
+    print(f"OVERALL SCORE: {overall_score:.2f}/100")
+    
+    if overall_score >= 90:
+        grade = "A+ (Outstanding)"
+    elif overall_score >= 80:
+        grade = "A (Excellent)"
+    elif overall_score >= 70:
+        grade = "B (Good)"
+    elif overall_score >= 60:
+        grade = "C (Acceptable)"
+    else:
+        grade = "D (Needs Improvement)"
+    
+    print(f"GRADE: {grade}")
+    print(f"{'='*80}\n")
+    
+    return overall_score
 
 # ================= MAIN =================
 if __name__=="__main__":
-    sboxes = generate_sboxes(seed=42)  # include random
-    results = {}
+    print("\n" + "="*80)
+    print("S-BOX CRYPTOGRAPHIC STRENGTH TESTING SUITE")
+    print("="*80)
+    print("This program tests S-boxes against standard cryptographic criteria:")
+    print("  • Balance: Equal distribution of 0s and 1s")
+    print("  • Bijectivity: One-to-one mapping (all unique values)")
+    print("  • Nonlinearity (NL): Resistance to linear approximation")
+    print("  • SAC: Avalanche effect (bit changes propagate)")
+    print("  • LAP: Linear approximation probability")
+    print("  • DAP: Differential approximation probability")
+    print("  • BIC-SAC: Bit independence in avalanche")
+    print("  • BIC-NL: Bit independence in nonlinearity")
+    print("="*80 + "\n")
+    
+    sboxes = generate_sboxes(include_random=True, seed=42)
+    all_results = {}
+    
+    # Test each S-box with detailed process
     for name, s in sboxes.items():
-        results[name] = evaluate_sbox(name, s)
-
-    save_results_csv(results, "sbox_results.csv")
-    save_results_json(results, "sbox_results.json")
-
-    print("Hasil pengujian S-box tersimpan di sbox_results.csv & sbox_results.json")
+        results = show_test_process(name, s, verbose=True)
+        all_results[name] = results
+        
+        # Show quality assessment
+        compare_with_ideal(results)
+    
+    # Save results
+    print("\n" + "="*80)
+    print("SAVING RESULTS...")
+    print("="*80)
+    
+    # Prepare results for CSV/JSON
+    formatted_results = {}
+    for name, results in all_results.items():
+        formatted_results[name] = {
+            "S-box": name,
+            **results
+        }
+    
+    save_results_csv(formatted_results, "sbox_results.csv")
+    save_results_json(formatted_results, "sbox_results.json")
+    
+    print("✅ Results saved to:")
+    print("   • sbox_results.csv")
+    print("   • sbox_results.json")
+    print("="*80 + "\n")
+    
+    # Final comparison table
+    print("\n" + "="*80)
+    print("FINAL COMPARISON TABLE")
+    print("="*80)
+    print(f"{'S-box':<10} {'Balance':<8} {'Bijec':<8} {'NL':<6} {'SAC':<10} {'LAP':<10} {'DAP':<10} {'BIC-SAC':<10} {'BIC-NL':<6}")
+    print("-"*80)
+    
+    for name, results in all_results.items():
+        print(f"{name:<10} {str(results['Balance']):<8} {str(results['Bijective']):<8} "
+              f"{results['NL']:<6} {results['SAC']:<10.6f} {results['LAP']:<10.6f} "
+              f"{results['DAP']:<10.6f} {results['BIC-SAC']:<10.6f} {results['BIC-NL']:<6}")
+    
+    print("="*80 + "\n")

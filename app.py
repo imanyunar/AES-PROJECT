@@ -1,28 +1,362 @@
-from flask import Flask, render_template, request, send_file, jsonify
+import streamlit as st
 import io
 import csv
 import numpy as np
 import random
 import hashlib
-from sbox_utils import generate_sboxes, balance, bijective, nonlinearity, sac, lap, dap, bic_sac_fast, bic_nl_fast
+import json
+import pandas as pd
+from pathlib import Path
+
+from sbox_utils import (
+    generate_sboxes, balance, bijective, nonlinearity,
+    sac, lap, dap, bic_sac_fast, bic_nl_fast,
+    show_test_process, compare_with_ideal
+)
+
 from crypto import AESCustom
 
-app = Flask(__name__)
-app.secret_key = 'replace-with-your-secret-key'  # Ganti dengan key aman
+from crypto_functions import image_comparison_page
+from image_encrypt_separate import image_encrypt_ui_new
 
-# Cache global untuk menyimpan hasil metrics
-# Format: {sbox_hash: {metrics_dict}}
-METRICS_CACHE = {}
+from sbox_registry import extend_sbox_registry
+
+# Page configuration
+st.set_page_config(
+    page_title="AES Encryption Suite",
+    page_icon="🔐",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+
+st.markdown("""
+<style>
+    /* Global Fade-in Animation */
+    .stApp {
+        animation: fadeIn 1.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+        0% { opacity: 0; transform: translateY(10px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-image: linear-gradient(180deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        border-right: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    /* Tombol Modern */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+        color: white;
+        border: none;
+        padding: 10px;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    .stButton>button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(37, 117, 252, 0.5);
+    }
+
+    /* Card untuk Metrik */
+    [data-testid="stMetricValue"] {
+        color: #00f2fe;
+        font-family: 'Courier New', monospace;
+    }
+    
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(255,255,255,0.05);
+        border-radius: 8px 8px 0 0;
+        padding: 10px 20px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Custom CSS with animations
+st.markdown("""
+<style>
+    /* Main animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+    
+    @keyframes glow {
+        0%, 100% {
+            box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+        }
+        50% {
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.8);
+        }
+    }
+    
+    /* Metric cards with gradient */
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 15px;
+        margin: 10px 0;
+        color: white;
+        animation: fadeInUp 0.5s ease-out;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    
+    /* Progress bar styling */
+    .stProgress > div > div > div > div {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        animation: pulse 2s infinite;
+    }
+    
+    /* Success box with animation */
+    .success-box {
+        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        border: 2px solid #28a745;
+        color: #155724;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        animation: slideInRight 0.5s ease-out;
+        box-shadow: 0 2px 10px rgba(40, 167, 69, 0.2);
+    }
+    
+    /* Error box */
+    .error-box {
+        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        border: 2px solid #dc3545;
+        color: #721c24;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        animation: slideInRight 0.5s ease-out;
+        box-shadow: 0 2px 10px rgba(220, 53, 69, 0.2);
+    }
+    
+    /* Info box */
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border: 2px solid #17a2b8;
+        color: #0c5460;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        animation: fadeInUp 0.5s ease-out;
+        box-shadow: 0 2px 10px rgba(23, 162, 184, 0.2);
+    }
+    
+    /* Button hover effect */
+    .stButton>button {
+        transition: all 0.3s ease;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    
+    /* Selectbox animation */
+    .stSelectbox {
+        animation: fadeInUp 0.5s ease-out;
+    }
+    
+    /* Headers with gradient text */
+    h1, h2, h3 {
+        animation: fadeInUp 0.7s ease-out;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        animation: fadeInUp 0.8s ease-out;
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: white;
+    }
+    
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        animation: slideInRight 0.5s ease-out;
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        font-size: 1.5rem;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, #f0f2f6 0%, #e9ecef 100%);
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        transform: translateX(5px);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    /* Text input glow effect */
+    .stTextInput>div>div>input:focus {
+        animation: glow 2s infinite;
+        border-color: #667eea;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Path untuk file hasil metrics
+METRICS_FILE = Path(__file__).parent / 'sbox_results.json'
+
+# Initialize session state
+if 'metrics_cache' not in st.session_state:
+    st.session_state.metrics_cache = {}
+if 'metrics_by_name' not in st.session_state:
+    st.session_state.metrics_by_name = {}
+if 'encrypted_result' not in st.session_state:
+    st.session_state.encrypted_result = ''
+if 'encrypted_result_decimal' not in st.session_state:
+    st.session_state.encrypted_result_decimal = ''
+if 'encrypted_result_text' not in st.session_state:
+    st.session_state.encrypted_result_text = ''
+if 'decrypted_result' not in st.session_state:
+    st.session_state.decrypted_result = ''
+if 'decrypted_result_decimal' not in st.session_state:
+    st.session_state.decrypted_result_decimal = ''
+if 'decrypted_result_text' not in st.session_state:
+    st.session_state.decrypted_result_text = ''
+if 'encrypted_image' not in st.session_state:
+    st.session_state.encrypted_image = None
+if 'decrypted_image' not in st.session_state:
+    st.session_state.decrypted_image = None
+if 'show_encrypted_image' not in st.session_state:
+    st.session_state.show_encrypted_image = False
+if 'show_decrypted_image' not in st.session_state:
+    st.session_state.show_decrypted_image = False
+if 'original_image' not in st.session_state:
+    st.session_state.original_image = None
+if 'stored_image_key' not in st.session_state:
+    st.session_state.stored_image_key = ''
+if 'image_sbox_name' not in st.session_state:
+    st.session_state.image_sbox_name = ''
+if 'show_sbox_metrics' not in st.session_state:
+    st.session_state.show_sbox_metrics = False
+if 'current_original_image' not in st.session_state:
+    st.session_state.current_original_image = None
+if 'decrypt_source_image' not in st.session_state:
+    st.session_state.decrypt_source_image = None
+if 'has_original_for_validation' not in st.session_state:
+    st.session_state.has_original_for_validation = False
+if 'decrypt_from_current_session' not in st.session_state:
+    st.session_state.decrypt_from_current_session = True
+
+
+def load_metrics_from_file():
+    """Load pre-calculated metrics dari file JSON"""
+    if METRICS_FILE.exists():
+        try:
+            with open(METRICS_FILE, 'r') as f:
+                data = json.load(f)
+                
+                st.session_state.metrics_by_name = data
+                
+                # Build hash-based cache
+                sboxes = generate_sboxes(include_random=False)
+                for name, sbox in sboxes.items():
+                    if name in st.session_state.metrics_by_name:
+                        sbox_hash = get_sbox_hash(sbox)
+                        metrics = {k: v for k, v in st.session_state.metrics_by_name[name].items() if k != "S-box"}
+                        st.session_state.metrics_cache[sbox_hash] = metrics
+                
+                return True
+        except Exception as e:
+            st.error(f"Error loading metrics file: {e}")
+            st.session_state.metrics_cache = {}
+            st.session_state.metrics_by_name = {}
+            return False
+    else:
+        st.session_state.metrics_cache = {}
+        st.session_state.metrics_by_name = {}
+        return False
+
+def save_metrics_to_file():
+    """Save calculated metrics ke file JSON"""
+    try:
+        data = {}
+        for name, metrics in st.session_state.metrics_by_name.items():
+            data[name] = {
+                "S-box": name,
+                **metrics
+            }
+        
+        with open(METRICS_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
+        return True
+    except Exception as e:
+        st.error(f"Error saving metrics file: {e}")
+        return False
 
 def get_sbox_hash(sbox):
     """Generate unique hash untuk S-box"""
     return hashlib.md5(sbox.tobytes()).hexdigest()
 
-def sbox_metrics(sbox, force_recalculate=False):
+def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
     """Hitung metrics S-box dengan caching"""
+    if not force_recalculate and sbox_name and sbox_name in st.session_state.metrics_by_name:
+        return st.session_state.metrics_by_name[sbox_name], True
+    
     sbox_hash = get_sbox_hash(sbox)
-    if not force_recalculate and sbox_hash in METRICS_CACHE:
-        return METRICS_CACHE[sbox_hash], True
+    if not force_recalculate and sbox_hash in st.session_state.metrics_cache:
+        return st.session_state.metrics_cache[sbox_hash], True
+    
     metrics = {
         "Balance": balance(sbox),
         "Bijective": bijective(sbox),
@@ -33,8 +367,21 @@ def sbox_metrics(sbox, force_recalculate=False):
         "BIC-SAC": bic_sac_fast(sbox),
         "BIC-NL": bic_nl_fast(sbox)
     }
-    METRICS_CACHE[sbox_hash] = metrics
-    return metrics, False
+    
+    metrics_serializable = {}
+    for key, value in metrics.items():
+        if isinstance(value, (np.integer, np.floating)):
+            metrics_serializable[key] = float(value)
+        elif isinstance(value, np.bool_):
+            metrics_serializable[key] = bool(value)
+        else:
+            metrics_serializable[key] = value
+    
+    st.session_state.metrics_cache[sbox_hash] = metrics_serializable
+    if sbox_name:
+        st.session_state.metrics_by_name[sbox_name] = metrics_serializable
+    
+    return metrics_serializable, False
 
 def calculate_progress_width(key, value):
     """Hitung width progress bar untuk setiap metric"""
@@ -66,27 +413,27 @@ def get_metric_score(key, value):
         else:
             return 50
     except:
-        return 50
+        return 0
 
 def parse_user_bytes(user_input, length=16):
     """Convert user input to bytes safely, truncate/pad ke length"""
     if not user_input:
         return bytes([0]*length)
     
-    # Ensure input is string
     if isinstance(user_input, bytes):
         user_input = user_input.decode('utf-8', errors='ignore')
     
-    user_input = str(user_input).strip().replace(" ", "")
+    user_input = str(user_input).strip()
+    user_input_no_space = user_input.replace(" ", "")
     
     try:
-        # Try to parse as hex
-        b = bytes.fromhex(user_input)
+        if all(c in '0123456789abcdefABCDEF' for c in user_input_no_space):
+            b = bytes.fromhex(user_input_no_space)
+        else:
+            b = user_input.encode('utf-8')
     except ValueError:
-        # If not hex, encode as UTF-8
         b = user_input.encode('utf-8')
     
-    # Adjust length
     if len(b) > length:
         b = b[:length]
     elif len(b) < length:
@@ -100,8 +447,6 @@ def parse_custom_sbox(custom_sbox_str):
         raise ValueError("Custom S-box string is empty")
     
     sbox_list = []
-    
-    # Split by comma
     parts = custom_sbox_str.split(',')
     
     for i, part in enumerate(parts):
@@ -111,215 +456,752 @@ def parse_custom_sbox(custom_sbox_str):
             continue
         
         try:
-            # Try parsing with base auto-detect (0x for hex, 0o for octal, etc.)
             val = int(part, 0)
         except ValueError:
             try:
-                # Try parsing as base 10
                 val = int(part)
             except ValueError:
                 raise ValueError(f"Cannot parse value at position {i}: '{part}'")
         
-        # Validate range
         if not (0 <= val <= 255):
             raise ValueError(f"Value at position {i} is out of range (0-255): {val}")
         
         sbox_list.append(val)
     
-    # Validate length
     if len(sbox_list) != 256:
         raise ValueError(f"Custom S-box must have exactly 256 elements, got {len(sbox_list)}")
     
-    # Validate uniqueness (bijective requirement)
     if len(set(sbox_list)) != 256:
         raise ValueError("Custom S-box must contain 256 unique values (bijective requirement)")
     
     return np.array(sbox_list, dtype=np.uint8)
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    sboxes = generate_sboxes(include_random=True)
-    result = ''
-    metrics = {}
-    plaintext = ''
-    key = ''
-    sbox_choice = 'K44'
-    custom_sbox = ''
-    active_sbox = None
-    from_cache = False
-    show_recalculate_button = False
-
-    if request.method == 'POST':
-        action = request.form.get('action')
-        sbox_choice = request.form.get('sbox_choice')
-
-        # Tentukan S-box aktif
-        if sbox_choice in sboxes:
-            active_sbox = sboxes[sbox_choice]
-        elif sbox_choice == "RANDOM":
-            active_sbox = np.array(random.sample(range(256), 256), dtype=np.uint8)
-        elif sbox_choice == "CUSTOM":
-            custom_sbox_str = request.form.get('custom_sbox', '')
-            custom_sbox = custom_sbox_str
-            try:
-                active_sbox = parse_custom_sbox(custom_sbox_str)
-            except Exception as e:
-                result = f"❌ Error parsing custom S-box: {str(e)}"
-                active_sbox = None
+def calculate_std_metrics(sboxes_dict=None):
+    """Calculate standard deviation and other statistics for each metric across all S-boxes"""
+    metrics_by_type = {}
+    
+    if sboxes_dict is None:
+        data_source = st.session_state.metrics_by_name
+    else:
+        data_source = {}
+        for name, sbox in sboxes_dict.items():
+            metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=False)
+            data_source[name] = metrics
+    
+    for name, metrics in data_source.items():
+        for metric_name, value in metrics.items():
+            if metric_name not in ["Balance", "Bijective", "S-box"]:
+                if metric_name not in metrics_by_type:
+                    metrics_by_type[metric_name] = []
+                metrics_by_type[metric_name].append(float(value))
+    
+    std_results = {}
+    for metric_name, values in metrics_by_type.items():
+        if len(values) > 1:
+            std_results[metric_name] = {
+                'std': float(np.std(values, ddof=1)),
+                'mean': float(np.mean(values)),
+                'min': float(np.min(values)),
+                'max': float(np.max(values)),
+                'median': float(np.median(values))
+            }
         else:
-            result = "❌ S-box tidak dikenali"
-            active_sbox = None
+            std_results[metric_name] = {
+                'std': 0.0,
+                'mean': float(values[0]) if values else 0.0,
+                'min': float(values[0]) if values else 0.0,
+                'max': float(values[0]) if values else 0.0,
+                'median': float(values[0]) if values else 0.0
+            }
+    
+    return std_results
 
-        # Download S-box CSV
-        if action == "Download S-Box CSV" and active_sbox is not None:
+def display_metrics(metrics, from_cache=False):
+    """Display metrics with progress bars"""
+    if from_cache:
+        st.info("📦 Using cached metrics")
+    
+    for key, value in metrics.items():
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.write(f"**{key}:**")
+        with col2:
+            if key in ["Balance", "Bijective"]:
+                st.write("✅ Pass" if value else "❌ Fail")
+            else:
+                progress = calculate_progress_width(key, value) / 100
+                st.progress(progress)
+                st.write(f"{value}")
+
+# Load metrics on startup
+if 'metrics_loaded' not in st.session_state:
+    with st.spinner("Loading metrics..."):
+        load_metrics_from_file()
+        st.session_state.metrics_loaded = True
+
+# Main title
+st.title("🔐 AES Encryption Suite")
+st.markdown("---")
+
+# Sidebar
+with st.sidebar:
+    st.header("Navigation")
+    page = st.radio("Select Page", [
+        "🏠 Home - Encryption/Decryption",
+        "📊 S-Box Comparison",
+        "🖼️ Image S-Box Comparison",
+        "🔬 S-Box Testing",
+        "📈 Statistics",
+        "🔍 S-Box Viewer"
+    ])
+    
+    st.markdown("---")
+    st.info("**Tip:** Use the navigation above to explore different features of the AES Encryption Suite.")
+
+# Page: Home - Encryption/Decryption
+if page == "🏠 Home - Encryption/Decryption":
+    st.header("Encryption & Decryption")
+    
+    # S-box selection dengan kategorisasi
+    from image_crypto import test_image_sboxes
+    
+    sboxes = generate_sboxes(include_random=True)
+    # Tambahkan image sboxes dengan prefix "IMG-"
+    image_sboxes_dict = test_image_sboxes()
+    for name, sbox in image_sboxes_dict.items():
+        sboxes[f"IMG-{name}"] = sbox
+    
+    # Kategorisasi S-boxes
+    text_sboxes = sorted([name for name in sboxes.keys() if not name.startswith("IMG-") and name not in ["RANDOM"]])
+    image_sboxes = sorted([name for name in sboxes.keys() if name.startswith("IMG-")])
+    
+    # Gabungkan dalam urutan yang rapi
+    all_sboxes = text_sboxes + image_sboxes + ["RANDOM", "CUSTOM"]
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        sbox_choice = st.selectbox(
+            "Select S-Box", 
+            all_sboxes, 
+            index=0,
+            help="📝 Text S-boxes (AES, A0-A2, K4/K44/K128) | 🖼️ Image S-boxes (IMG-S-box1/2/3) | 🎲 Dynamic (RANDOM/CUSTOM)"
+        )
+        
+        # Display S-box type info dengan styling yang lebih baik
+        if sbox_choice.startswith("IMG-"):
+            st.info("🖼️ **Image S-box** - Optimized for image encryption")
+        elif sbox_choice == "RANDOM":
+            st.warning("🎲 **Random S-box** - Click 'Generate Random S-Box' button below")
+        elif sbox_choice == "CUSTOM":
+            st.warning("✏️ **Custom S-box** - Enter your own 256 values below")
+        elif sbox_choice == "AES":
+            st.success("🔒 **AES Standard S-box** - Rijndael's original design used in AES-128/192/256")
+        else:
+            st.info("📝 **Text S-box** - Generated using affine matrix transformation")
+            
+    with col2:
+        # Show quick stats when S-box is selected
+        if sbox_choice and sbox_choice in sboxes:
+            st.markdown("#### 📊 Quick Info")
+            sbox_type = "🖼️ Image" if sbox_choice.startswith("IMG-") else "📝 Text"
+            st.caption(f"**Type:** {sbox_type}")
+            st.caption(f"**Size:** 256 bytes")
+            st.caption(f"**Name:** {sbox_choice}")
+        
+        if st.button("🔄 Recalculate Metrics", key="recalc_single", use_container_width=True):
+            if sbox_choice in sboxes:
+                with st.spinner("Recalculating..."):
+                    active_sbox = sboxes[sbox_choice]
+                    metrics, _ = sbox_metrics(active_sbox, sbox_name=sbox_choice, force_recalculate=True)
+                    st.success("✅ Metrics recalculated!")
+    
+    # Custom S-box input (sisanya tetap sama)
+    custom_sbox_str = ""
+    if sbox_choice == "CUSTOM":
+        st.markdown("---")
+        st.markdown("### ✏️ Custom S-Box Input")
+        custom_sbox_str = st.text_area(
+            "Enter 256 comma-separated values (0-255)",
+            height=100,
+            placeholder="0,1,2,3,4,5,...,254,255",
+            help="Must be a valid bijective mapping - all values 0-255 must appear exactly once"
+        )
+        
+        # Show example
+        with st.expander("📖 See Example"):
+            st.code("0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,...,255")
+            st.caption("💡 Tip: Use Excel or Python to generate and validate your S-box")
+    
+    # Determine active S-box (sisanya tetap sama)
+    active_sbox = None
+    if sbox_choice in sboxes:
+        active_sbox = sboxes[sbox_choice]
+    elif sbox_choice == "RANDOM":
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🎲 Generate Random S-Box", use_container_width=True):
+                active_sbox = np.array(random.sample(range(256), 256), dtype=np.uint8)
+                st.session_state.random_sbox = active_sbox
+                st.success("✅ Random S-box generated!")
+                st.balloons()
+        with col2:
+            if 'random_sbox' in st.session_state:
+                if st.button("🔄 Regenerate", use_container_width=True):
+                    active_sbox = np.array(random.sample(range(256), 256), dtype=np.uint8)
+                    st.session_state.random_sbox = active_sbox
+                    st.success("✅ Regenerated!")
+        
+        if 'random_sbox' in st.session_state:
+            active_sbox = st.session_state.random_sbox
+            st.info("✅ Random S-box is active and ready to use")
+    elif sbox_choice == "CUSTOM" and custom_sbox_str:
+        try:
+            active_sbox = parse_custom_sbox(custom_sbox_str)
+            st.success("✅ Custom S-box parsed and validated successfully!")
+            st.info(f"🎯 All 256 unique values confirmed - S-box is bijective")
+        except Exception as e:
+            st.error(f"❌ Error parsing custom S-box: {str(e)}")
+            st.info("💡 Make sure you have exactly 256 comma-separated values (0-255) with no duplicates")
+            active_sbox = None
+    
+    # Display S-box metrics - OPTIONAL (tidak otomatis)
+    if active_sbox is not None and sbox_choice not in ["RANDOM", "CUSTOM"]:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"### 📊 S-Box Selected: **{sbox_choice}**")
+        with col2:
+            if st.button("📈 Show Metrics", use_container_width=True, key="show_metrics_btn"):
+                st.session_state.show_sbox_metrics = True
+        
+        if st.session_state.get('show_sbox_metrics', False):
             try:
-                proxy = io.StringIO()
-                writer = csv.writer(proxy)
+                with st.spinner("Calculating metrics..."):
+                    metrics, from_cache = sbox_metrics(active_sbox, sbox_name=sbox_choice, force_recalculate=False)
+                st.success("✅ Metrics loaded")
+                display_metrics(metrics, from_cache)
+                
+                if st.button("🗑️ Hide Metrics", key="hide_metrics_btn"):
+                    st.session_state.show_sbox_metrics = False
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error calculating metrics: {str(e)}")
+    
+    # Download S-box
+    if active_sbox is not None:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("⬇️ Download S-Box CSV", use_container_width=True):
+                csv_buffer = io.StringIO()
+                writer = csv.writer(csv_buffer)
                 for val in active_sbox:
                     writer.writerow([val])
-                mem = io.BytesIO()
-                mem.write(proxy.getvalue().encode('utf-8'))
-                mem.seek(0)
-                proxy.close()
-                filename = f"{sbox_choice}_sbox.csv"
-                return send_file(mem, as_attachment=True, download_name=filename, mimetype='text/csv')
-            except Exception as e:
-                result = f"❌ Error downloading S-box: {str(e)}"
-
-        # Recalculate All Metrics
-        if action == "Recalculate All Metrics" and active_sbox is not None:
-            try:
-                metrics, from_cache = sbox_metrics(active_sbox, force_recalculate=True)
-                result = "✅ Metrics berhasil dihitung ulang!"
-                show_recalculate_button = True
-            except Exception as e:
-                result = f"❌ Error calculating metrics: {str(e)}"
-
-        # Hitung metrics S-box aktif (tanpa recalc)
-        elif active_sbox is not None and action not in ["Encrypt", "Decrypt"]:
-            try:
-                metrics, from_cache = sbox_metrics(active_sbox, force_recalculate=False)
-                show_recalculate_button = True
-            except Exception as e:
-                result = f"❌ Error calculating metrics: {str(e)}"
-
-        # Encrypt / Decrypt
-        if action in ["Encrypt", "Decrypt"] and active_sbox is not None:
-            plaintext_input = request.form.get('plaintext', '')
-            key_input = request.form.get('key', '')
-            
-            try:
-                pt_bytes = parse_user_bytes(plaintext_input, length=16)
-                key_bytes = parse_user_bytes(key_input, length=16)
                 
-                aes = AESCustom(sbox_name=sbox_choice, key_bytes=key_bytes)
-                aes.sbox = active_sbox  # Override jika random/custom
-                
-                # Generate inverse S-box
-                aes.inv_sbox = np.zeros(256, dtype=np.uint8)
-                for i in range(256):
-                    aes.inv_sbox[aes.sbox[i]] = i
-                
-                if action == "Encrypt":
+                st.download_button(
+                    label="Save CSV File",
+                    data=csv_buffer.getvalue(),
+                    file_name=f"{sbox_choice}_sbox.csv",
+                    mime="text/csv",
+                    key="download_sbox_csv"
+                )
+    
+    st.markdown("---")
+    
+    # Encryption/Decryption
+    st.subheader("🔐 Text Encryption/Decryption")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        plaintext_input = st.text_input("Input Text (max 16 bytes)", value="", key="text_input_field")
+    with col2:
+        key_input = st.text_input("Key (16 bytes)", value="", type="password", key="text_key_field")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔒 Encrypt", use_container_width=True, key="encrypt_text_btn"):
+            if active_sbox is not None:
+                try:
+                    pt_bytes = parse_user_bytes(plaintext_input, length=16)
+                    key_bytes = parse_user_bytes(key_input, length=16)
+                    
+                    aes = AESCustom(sbox_name=sbox_choice, key_bytes=key_bytes)
+                    aes.sbox = active_sbox
+                    
+                    aes.inv_sbox = np.zeros(256, dtype=np.uint8)
+                    for i in range(256):
+                        aes.inv_sbox[aes.sbox[i]] = i
+                    
                     ct_bytes = aes.encrypt(pt_bytes)
-                    result = ct_bytes.hex()
-                else:  # Decrypt
-                    pt_bytes2 = aes.decrypt(pt_bytes)
-                    result = pt_bytes2.hex()
-                
-                plaintext = pt_bytes.hex()
-                key = key_bytes.hex()
-                
-            except Exception as e:
-                result = f"❌ Error during {action.lower()}: {str(e)}"
-                import traceback
-                print(f"Encryption/Decryption Error: {traceback.format_exc()}")
-
-    return render_template('index.html',
-                           result=result,
-                           plaintext=plaintext,
-                           key=key,
-                           sbox_choice=sbox_choice,
-                           custom_sbox=custom_sbox,
-                           metrics=metrics,
-                           from_cache=from_cache,
-                           show_recalculate_button=show_recalculate_button,
-                           calculate_progress_width=calculate_progress_width,
-                           active_sbox=active_sbox
-                           )
-
-@app.route('/api/compare-sboxes', methods=['GET'])
-def compare_sboxes():
-    """API endpoint untuk mendapatkan comparison metrics semua S-boxes"""
-    try:
-        sboxes = generate_sboxes(include_random=False)  # Exclude random untuk consistency
-        comparison_data = {}
+                    st.session_state.encrypted_result = ct_bytes.hex()
+                    st.session_state.encrypted_result_decimal = ' '.join(str(b) for b in ct_bytes)
+                    try:
+                        st.session_state.encrypted_result_text = ct_bytes.decode('utf-8', errors='replace')
+                    except:
+                        st.session_state.encrypted_result_text = '(non-printable)'
+                    
+                    st.success("✅ Encryption completed!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during encryption: {str(e)}")
+            else:
+                st.error("❌ Please select or define an S-box first")
+    
+    with col2:
+        if st.button("🔓 Decrypt", use_container_width=True, key="decrypt_text_btn"):
+            if active_sbox is not None:
+                try:
+                    ct_bytes = parse_user_bytes(plaintext_input, length=16)
+                    key_bytes = parse_user_bytes(key_input, length=16)
+                    
+                    aes = AESCustom(sbox_name=sbox_choice, key_bytes=key_bytes)
+                    aes.sbox = active_sbox
+                    
+                    aes.inv_sbox = np.zeros(256, dtype=np.uint8)
+                    for i in range(256):
+                        aes.inv_sbox[aes.sbox[i]] = i
+                    
+                    pt_bytes = aes.decrypt(ct_bytes)
+                    st.session_state.decrypted_result = pt_bytes.hex()
+                    st.session_state.decrypted_result_decimal = ' '.join(str(b) for b in pt_bytes)
+                    try:
+                        st.session_state.decrypted_result_text = pt_bytes.decode('utf-8', errors='replace')
+                    except:
+                        st.session_state.decrypted_result_text = '(non-printable)'
+                    
+                    st.success("✅ Decryption completed!")
+                    
+                except Exception as e:
+                    st.error(f"❌ Error during decryption: {str(e)}")
+            else:
+                st.error("❌ Please select or define an S-box first")
+    
+    # Display Encryption Results
+    if st.session_state.encrypted_result:
+        st.markdown("### 🔒 Encryption Results")
         
-        for name, sbox in sboxes.items():
-            metrics, _ = sbox_metrics(sbox)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.text_input("Hex (Encrypted)", st.session_state.encrypted_result, disabled=True, key="enc_hex")
+        with col2:
+            if st.button("📋 Copy", key="copy_enc"):
+                st.toast("Copied to clipboard!")
+        
+        st.text_input("Decimal (Encrypted)", st.session_state.encrypted_result_decimal, disabled=True, key="enc_dec")
+        
+        text_clean = st.session_state.encrypted_result_text.rstrip('\x00').replace('\x00', '')
+        st.text_input("Text (Encrypted)", text_clean, disabled=True, key="enc_text")
+        
+        st.caption(f"📏 Length: {len(bytes.fromhex(st.session_state.encrypted_result))} bytes")
+        
+        if st.button("🗑️ Clear Encryption Result"):
+            st.session_state.encrypted_result = ''
+            st.session_state.encrypted_result_decimal = ''
+            st.session_state.encrypted_result_text = ''
+            st.rerun()
+    
+    # Display Decryption Results
+    if st.session_state.decrypted_result:
+        st.markdown("### 🔓 Decryption Results")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.text_input("Hex (Decrypted)", st.session_state.decrypted_result, disabled=True, key="dec_hex")
+        with col2:
+            if st.button("📋 Copy", key="copy_dec"):
+                st.toast("Copied to clipboard!")
+        
+        st.text_input("Decimal (Decrypted)", st.session_state.decrypted_result_decimal, disabled=True, key="dec_dec")
+        
+        text_clean = st.session_state.decrypted_result_text.rstrip('\x00').replace('\x00', '')
+        st.text_input("Text (Decrypted)", text_clean, disabled=True, key="dec_text")
+        
+        st.caption(f"📏 Length: {len(bytes.fromhex(st.session_state.decrypted_result))} bytes")
+        
+        if st.button("🗑️ Clear Decryption Result"):
+            st.session_state.decrypted_result = ''
+            st.session_state.decrypted_result_decimal = ''
+            st.session_state.decrypted_result_text = ''
+            st.rerun()
+
+    # ==============================
+    # IMAGE ENCRYPTION (TAMBAHAN)
+    # ==============================
+    image_encrypt_ui_new(active_sbox, sbox_choice)
+
+    # Page: Image S-Box Comparison
+elif page == "🖼️ Image S-Box Comparison":
+    sboxes = generate_sboxes(include_random=False)
+    sboxes = extend_sbox_registry(sboxes)
+    image_comparison_page(sboxes)
+
+# Page: S-Box Comparison
+elif page == "📊 S-Box Comparison":
+    st.header("S-Box Comparison")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write("Compare cryptographic metrics across all S-boxes")
+    with col2:
+        if st.button("🔄 Recalculate All", key="recalc_all"):
+            with st.spinner("Recalculating all S-boxes..."):
+                sboxes = generate_sboxes(include_random=False)
+                progress_bar = st.progress(0)
+                total = len(sboxes)
+                
+                for idx, (name, sbox) in enumerate(sboxes.items()):
+                    metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=True)
+                    progress_bar.progress((idx + 1) / total)
+                
+                save_metrics_to_file()
+                st.success(f"✅ Recalculated {total} S-boxes!")
+                st.rerun()
+    
+    # Calculate comparison data
+    sboxes = generate_sboxes(include_random=False)
+    comparison_data = {}
+    
+    for name, sbox in sboxes.items():
+        metrics, _ = sbox_metrics(sbox, sbox_name=name, force_recalculate=False)
+        
+        scores = []
+        for key, value in metrics.items():
+            if key not in ["Balance", "Bijective"]:
+                scores.append(get_metric_score(key, value))
+        
+        overall_score = sum(scores) / len(scores) if scores else 0
+        
+        comparison_data[name] = {
+            'metrics': metrics,
+            'overall_score': round(overall_score, 2)
+        }
+    
+    # Display statistics
+    std_metrics = calculate_std_metrics(sboxes)
+    
+    st.subheader("📈 Statistical Summary")
+    stats_df = pd.DataFrame(std_metrics).T
+    st.dataframe(stats_df.style.format("{:.6f}"), use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Display comparison table
+    st.subheader("🔢 Detailed Comparison")
+    
+    # Build comparison dataframe
+    comparison_rows = []
+    for name, data in comparison_data.items():
+        row = {'S-Box': name, 'Overall Score': data['overall_score']}
+        row.update(data['metrics'])
+        comparison_rows.append(row)
+    
+    df = pd.DataFrame(comparison_rows)
+    df = df.sort_values('Overall Score', ascending=False)
+    
+    # Format and display
+    st.dataframe(df.style.format({
+        'Overall Score': '{:.2f}',
+        'NL': '{:.2f}',
+        'SAC': '{:.4f}',
+        'LAP': '{:.6f}',
+        'DAP': '{:.6f}',
+        'BIC-SAC': '{:.4f}',
+        'BIC-NL': '{:.2f}'
+    }), use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Individual S-box comparison
+    st.subheader("🔍 Individual S-Box Analysis")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        selected_sboxes = st.multiselect(
+            "Select S-Boxes to Compare (select 2 or more)",
+            options=list(sboxes.keys()),
+            default=list(sboxes.keys())[:2] if len(sboxes) >= 2 else list(sboxes.keys())
+        )
+    
+    if len(selected_sboxes) >= 2:
+        # Create detailed comparison for selected S-boxes
+        st.write(f"**Comparing {len(selected_sboxes)} S-Boxes:**")
+        
+        # Prepare data for comparison
+        comparison_detail = []
+        for name in selected_sboxes:
+            if name in comparison_data:
+                comparison_detail.append({
+                    'S-Box': name,
+                    **comparison_data[name]['metrics'],
+                    'Overall Score': comparison_data[name]['overall_score']
+                })
+        
+        df_selected = pd.DataFrame(comparison_detail)
+        
+        # Display as styled table
+        st.dataframe(df_selected.style.format({
+            'Overall Score': '{:.2f}',
+            'NL': '{:.2f}',
+            'SAC': '{:.4f}',
+            'LAP': '{:.6f}',
+            'DAP': '{:.6f}',
+            'BIC-SAC': '{:.4f}',
+            'BIC-NL': '{:.2f}'
+        }), use_container_width=True)
+        
+        # Visualization for selected S-boxes
+        st.subheader("📊 Metric Comparison Chart")
+        
+        # Prepare data for chart (non-boolean metrics only)
+        chart_metrics = ['NL', 'SAC', 'LAP', 'DAP', 'BIC-SAC', 'BIC-NL']
+        
+        for metric in chart_metrics:
+            if metric in df_selected.columns:
+                chart_data = df_selected[['S-Box', metric]].set_index('S-Box')
+                st.write(f"**{metric}**")
+                st.bar_chart(chart_data)
+        
+        # Download selected comparison
+        csv_buffer_selected = io.StringIO()
+        df_selected.to_csv(csv_buffer_selected, index=False)
+        st.download_button(
+            label=f"⬇️ Download Selected Comparison ({len(selected_sboxes)} S-Boxes)",
+            data=csv_buffer_selected.getvalue(),
+            file_name=f"sbox_comparison_selected_{len(selected_sboxes)}.csv",
+            mime="text/csv",
+            key="download_selected"
+        )
+    elif len(selected_sboxes) == 1:
+        st.info("Please select at least 2 S-boxes for comparison")
+    
+    st.markdown("---")
+    
+    # Download all comparison
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+    st.download_button(
+        label=f"⬇️ Download All Comparison ({len(df)} S-Boxes)",
+        data=csv_buffer.getvalue(),
+        file_name="sbox_comparison_all.csv",
+        mime="text/csv",
+        key="download_all"
+    )
+
+# Page: S-Box Testing
+elif page == "🔬 S-Box Testing":
+    st.header("S-Box Quality Testing")
+    
+    sboxes = generate_sboxes(include_random=False)
+    sbox_name = st.selectbox("Select S-Box for Testing", list(sboxes.keys()))
+    
+    if st.button("🧪 Run Detailed Test"):
+        with st.spinner(f"Testing {sbox_name}..."):
+            sbox = sboxes[sbox_name]
             
-            # Convert numpy types to Python native types for JSON serialization
-            metrics_json = {}
-            for key, value in metrics.items():
+            # Run detailed test
+            results = show_test_process(sbox_name, sbox, verbose=False)
+            
+            # Convert numpy types
+            results_native = {}
+            for key, value in results.items():
                 if isinstance(value, (np.integer, np.floating)):
-                    metrics_json[key] = float(value)
+                    results_native[key] = float(value)
                 elif isinstance(value, np.bool_):
-                    metrics_json[key] = bool(value)
+                    results_native[key] = bool(value)
                 else:
-                    metrics_json[key] = value
+                    results_native[key] = value
             
-            # Calculate overall score
+            # Calculate quality scores
+            ideals = {
+                'Balance': (True, 'boolean'),
+                'Bijective': (True, 'boolean'),
+                'NL': (112, 'higher'),
+                'SAC': (0.5, 'closer'),
+                'LAP': (0.0625, 'lower_equal'),
+                'DAP': (0.015625, 'lower_equal'),
+                'BIC-SAC': (0.5, 'closer'),
+                'BIC-NL': (112, 'higher')
+            }
+            
+            quality_scores = {}
             scores = []
-            for key, value in metrics_json.items():
-                if key not in ["Balance", "Bijective"]:  # Skip boolean metrics
-                    scores.append(get_metric_score(key, value))
+            
+            for metric, (ideal, comparison_type) in ideals.items():
+                value = results_native[metric]
+                
+                if comparison_type == 'boolean':
+                    score = 100 if value == ideal else 0
+                    status = "Pass" if value == ideal else "Fail"
+                elif comparison_type == 'higher':
+                    score = min(100, (value / ideal) * 100) if ideal > 0 else 0
+                    status = "Excellent" if value >= ideal else "Good" if value >= ideal * 0.9 else "Needs Improvement"
+                elif comparison_type == 'closer':
+                    deviation = abs(value - ideal)
+                    score = max(0, 100 - (deviation * 1000))
+                    status = "Excellent" if deviation < 0.01 else "Good" if deviation < 0.02 else "Needs Improvement"
+                elif comparison_type == 'lower_equal':
+                    if value <= ideal:
+                        score = 100
+                        status = "Excellent"
+                    else:
+                        score = max(0, 100 - ((value - ideal) / ideal * 100))
+                        status = "Acceptable" if value <= ideal * 1.2 else "Needs Improvement"
+                
+                quality_scores[metric] = {
+                    'value': value,
+                    'ideal': ideal,
+                    'score': score,
+                    'status': status
+                }
+                scores.append(score)
             
             overall_score = sum(scores) / len(scores) if scores else 0
             
-            comparison_data[name] = {
-                'metrics': metrics_json,
-                'overall_score': round(overall_score, 2)
-            }
-        
-        return jsonify(comparison_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+            if overall_score >= 90:
+                grade = "A+"
+            elif overall_score >= 80:
+                grade = "A"
+            elif overall_score >= 70:
+                grade = "B"
+            elif overall_score >= 60:
+                grade = "C"
+            else:
+                grade = "D"
+            
+            # Display results
+            st.success(f"Overall Score: **{overall_score:.2f}** | Grade: **{grade}**")
+            
+            st.subheader("Quality Assessment")
+            
+            for metric, data in quality_scores.items():
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col1:
+                    st.write(f"**{metric}**")
+                with col2:
+                    st.write(f"Value: {data['value']} | Ideal: {data['ideal']}")
+                with col3:
+                    if data['status'] == "Excellent" or data['status'] == "Pass":
+                        st.success(data['status'])
+                    elif data['status'] == "Good":
+                        st.info(data['status'])
+                    else:
+                        st.warning(data['status'])
+                
+                st.progress(data['score'] / 100)
 
-@app.route('/api/sbox-data/<sbox_name>', methods=['GET'])
-def get_sbox_data(sbox_name):
-    """API endpoint untuk mendapatkan data S-box dalam hex dan decimal"""
-    try:
-        sboxes = generate_sboxes(include_random=False)
+# Page: Statistics
+elif page == "📈 Statistics":
+    st.header("Statistical Analysis")
+    
+    stats = calculate_std_metrics()
+    
+    if stats:
+        # Create tabs for different views
+        tab1, tab2 = st.tabs(["📊 Summary Table", "📈 Visualizations"])
         
-        if sbox_name not in sboxes:
-            return jsonify({'error': 'S-box not found'}), 404
+        with tab1:
+            stats_df = pd.DataFrame(stats).T
+            st.dataframe(stats_df.style.format("{:.6f}"), use_container_width=True)
+            
+            # Download statistics
+            csv_buffer = io.StringIO()
+            stats_df.to_csv(csv_buffer)
+            st.download_button(
+                label="⬇️ Download Statistics CSV",
+                data=csv_buffer.getvalue(),
+                file_name="sbox_statistics.csv",
+                mime="text/csv"
+            )
         
-        sbox = sboxes[sbox_name]
-        
-        # Format data in 16x16 grid
-        sbox_data = {
+        with tab2:
+            # Display charts for each metric
+            for metric_name, values in stats.items():
+                st.subheader(metric_name)
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Mean", f"{values['mean']:.6f}")
+                with col2:
+                    st.metric("Std Dev", f"{values['std']:.6f}")
+                with col3:
+                    st.metric("Median", f"{values['median']:.6f}")
+                
+                # Create bar chart for min/max
+                chart_data = pd.DataFrame({
+                    'Statistic': ['Min', 'Max', 'Mean'],
+                    'Value': [values['min'], values['max'], values['mean']]
+                })
+                st.bar_chart(chart_data.set_index('Statistic'))
+                st.markdown("---")
+    else:
+        st.warning("No statistics available. Please load or calculate metrics first.")
+
+# Page: S-Box Viewer
+elif page == "🔍 S-Box Viewer":
+    st.header("S-Box Data Viewer")
+    
+    # Import image sboxes
+    from image_crypto import test_image_sboxes
+    
+    # Combine text and image sboxes
+    text_sboxes = generate_sboxes(include_random=False)
+    image_sboxes = test_image_sboxes()
+    
+    # Create combined dictionary with prefixes
+    all_sboxes = {}
+    for name, sbox in text_sboxes.items():
+        all_sboxes[f"📝 {name}"] = sbox
+    for name, sbox in image_sboxes.items():
+        all_sboxes[f"🖼️ {name}"] = sbox
+    
+    sbox_name = st.selectbox("Select S-Box", list(all_sboxes.keys()))
+    
+    sbox = all_sboxes[sbox_name]
+    
+    # Display format selection
+    display_format = st.radio("Display Format", ["Hexadecimal", "Decimal"], horizontal=True)
+    
+    # Create 16x16 grid
+    st.subheader(f"{sbox_name} S-Box ({display_format})")
+    
+    # Create dataframe for display
+    if display_format == "Hexadecimal":
+        data = [[f"{sbox[i*16 + j]:02X}" for j in range(16)] for i in range(16)]
+    else:
+        data = [[int(sbox[i*16 + j]) for j in range(16)] for i in range(16)]
+    
+    df = pd.DataFrame(data, 
+                     columns=[f"{i:X}" for i in range(16)],
+                     index=[f"{i:X}0" for i in range(16)])
+    
+    st.dataframe(df, use_container_width=True)
+    
+    # Download options
+    st.markdown("### ⬇️ Download S-Box Data")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer)
+        st.download_button(
+            label="📄 Download as CSV",
+            data=csv_buffer.getvalue(),
+            file_name=f"{sbox_name.replace('📝 ', '').replace('🖼️ ', '')}_sbox_{display_format.lower()}.csv",
+            mime="text/csv",
+            key="download_csv",
+            use_container_width=True
+        )
+    
+    with col2:
+        json_data = {
             'name': sbox_name,
-            'hex': [[f"{sbox[i*16 + j]:02X}" for j in range(16)] for i in range(16)],
-            'dec': [[int(sbox[i*16 + j]) for j in range(16)] for i in range(16)]
+            'format': display_format,
+            'sbox_flat': sbox.tolist(),
+            'sbox_2d': [[int(sbox[i*16 + j]) for j in range(16)] for i in range(16)]
         }
-        
-        return jsonify(sbox_data)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-if __name__ == "__main__":
-    # Pre-calculate metrics untuk S-box default saat startup
-    print("🚀 Initializing AES Encryption Suite...")
-    print("📊 Pre-calculating metrics for default S-boxes...")
-    sboxes = generate_sboxes(include_random=True)
-    for name, sbox in sboxes.items():
-        print(f"   Computing {name}...", end=" ")
-        try:
-            metrics, _ = sbox_metrics(sbox)
-            print("✓")
-        except Exception as e:
-            print(f"✗ Error: {e}")
-    print("✅ Ready! Metrics cached for instant access.")
-    print("=" * 50)
-    # Disable reloader to avoid double initialization
-    app.run(debug=True, use_reloader=False)
+        st.download_button(
+            label="📋 Download as JSON",
+            data=json.dumps(json_data, indent=4),
+            file_name=f"{sbox_name.replace('📝 ', '').replace('🖼️ ', '')}_sbox.json",
+            mime="application/json",
+            key="download_json",
+            use_container_width=True
+        )

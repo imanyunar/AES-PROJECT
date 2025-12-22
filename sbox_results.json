@@ -1,0 +1,90 @@
+{
+    "A0": {
+        "S-box": "A0",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.5078125,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.50115966796875,
+        "BIC-NL": 112.0
+    },
+    "A1": {
+        "S-box": "A1",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.498046875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5000348772321429,
+        "BIC-NL": 112.0
+    },
+    "A2": {
+        "S-box": "A2",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.498046875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5000348772321429,
+        "BIC-NL": 112.0
+    },
+    "K4": {
+        "S-box": "K4",
+        "Balance": true,
+        "Bijective": false,
+        "NL": 112,
+        "SAC": 0.509765625,
+        "LAP": 0.00390625,
+        "DAP": 0.0234375,
+        "BIC-SAC": 0.5008283342633929,
+        "BIC-NL": 112.0
+    },
+    "K44": {
+        "S-box": "K44",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.500732421875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.4996861049107143,
+        "BIC-NL": 112.0
+    },
+    "K128": {
+        "S-box": "K128",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.493896484375,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5014299665178571,
+        "BIC-NL": 112.0
+    },
+    "AES": {
+        "S-box": "AES",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 112,
+        "SAC": 0.5048828125,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5007411411830357,
+        "BIC-NL": 112.0
+    },
+    "RANDOM": {
+        "S-box": "RANDOM",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 88,
+        "SAC": 0.509033203125,
+        "LAP": 0.0244140625,
+        "DAP": 0.046875,
+        "BIC-SAC": 0.5009242466517857,
+        "BIC-NL": 100
+    }
+}

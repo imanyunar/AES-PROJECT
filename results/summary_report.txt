@@ -1,0 +1,194 @@
+================================================================================
+S-BOX IMAGE ENCRYPTION TEST SUMMARY
+================================================================================
+Test Date: 2025-12-21 17:57:58
+Total Tests: 21
+
+Paper: Alamsyah et al. (2023)
+Scientific Journal of Informatics, Vol. 10, No. 2, May 2023
+
+--------------------------------------------------------------------------------
+IDEAL VALUES
+--------------------------------------------------------------------------------
+  Entropy:  8.0000
+  NPCR:     99.6094%
+  UACI:     33.4635%
+
+--------------------------------------------------------------------------------
+PAPER RESULTS
+--------------------------------------------------------------------------------
+  Entropy:  7.9992 - 7.9994
+  NPCR:     99.5934% - 99.6288%
+
+================================================================================
+TEST RESULTS
+================================================================================
+
+cameraman_synthetic | S-box1 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.7818
+  Cipher Entropy:  7.7818
+  NPCR:            99.5941%
+  UACI:            28.6337%
+  Decryption:      OK
+
+cameraman_synthetic | S-box2 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.7818
+  Cipher Entropy:  7.7818
+  NPCR:            99.3095%
+  UACI:            30.5462%
+  Decryption:      OK
+
+cameraman_synthetic | S-box3 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.7818
+  Cipher Entropy:  7.7818
+  NPCR:            99.6677%
+  UACI:            30.2064%
+  Decryption:      OK
+
+lena_color_synthetic | S-box1 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.8259
+  Cipher Entropy:  6.8259
+  NPCR:            98.8847%
+  UACI:            28.7507%
+  Decryption:      OK
+
+lena_color_synthetic | S-box2 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.8259
+  Cipher Entropy:  6.8259
+  NPCR:            99.4330%
+  UACI:            31.2150%
+  Decryption:      OK
+
+lena_color_synthetic | S-box3 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.8259
+  Cipher Entropy:  6.8259
+  NPCR:            99.4506%
+  UACI:            31.8081%
+  Decryption:      OK
+
+livingroom_synthetic | S-box1 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.3214
+  Cipher Entropy:  7.3214
+  NPCR:            99.3671%
+  UACI:            27.1121%
+  Decryption:      OK
+
+livingroom_synthetic | S-box2 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.3214
+  Cipher Entropy:  7.3214
+  NPCR:            99.3980%
+  UACI:            30.5862%
+  Decryption:      OK
+
+livingroom_synthetic | S-box3 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.3214
+  Cipher Entropy:  7.3214
+  NPCR:            100.0000%
+  UACI:            29.1279%
+  Decryption:      OK
+
+mandrill_color_synthetic | S-box1 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9998
+  Cipher Entropy:  7.9998
+  NPCR:            99.6075%
+  UACI:            32.3603%
+  Decryption:      OK
+
+mandrill_color_synthetic | S-box2 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9998
+  Cipher Entropy:  7.9998
+  NPCR:            99.6156%
+  UACI:            35.1004%
+  Decryption:      OK
+
+mandrill_color_synthetic | S-box3 | RGB
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9998
+  Cipher Entropy:  7.9998
+  NPCR:            99.6076%
+  UACI:            32.9479%
+  Decryption:      OK
+
+pirate_synthetic | S-box1 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9994
+  Cipher Entropy:  7.9994
+  NPCR:            99.5960%
+  UACI:            32.3966%
+  Decryption:      OK
+
+pirate_synthetic | S-box2 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9994
+  Cipher Entropy:  7.9994
+  NPCR:            99.5960%
+  UACI:            35.1017%
+  Decryption:      OK
+
+pirate_synthetic | S-box3 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   7.9994
+  Cipher Entropy:  7.9994
+  NPCR:            99.6071%
+  UACI:            33.0453%
+  Decryption:      OK
+
+woman_blonde_synthetic | S-box1 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9065
+  Cipher Entropy:  6.9065
+  NPCR:            99.1718%
+  UACI:            29.0182%
+  Decryption:      OK
+
+woman_blonde_synthetic | S-box2 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9065
+  Cipher Entropy:  6.9065
+  NPCR:            99.1882%
+  UACI:            31.4069%
+  Decryption:      OK
+
+woman_blonde_synthetic | S-box3 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9065
+  Cipher Entropy:  6.9065
+  NPCR:            99.1909%
+  UACI:            32.2370%
+  Decryption:      OK
+
+woman_darkhair_synthetic | S-box1 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9066
+  Cipher Entropy:  6.9066
+  NPCR:            100.0000%
+  UACI:            26.7391%
+  Decryption:      OK
+
+woman_darkhair_synthetic | S-box2 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9066
+  Cipher Entropy:  6.9066
+  NPCR:            99.1592%
+  UACI:            27.7728%
+  Decryption:      OK
+
+woman_darkhair_synthetic | S-box3 | Grayscale
+--------------------------------------------------------------------------------
+  Plain Entropy:   6.9066
+  Cipher Entropy:  6.9066
+  NPCR:            100.0000%
+  UACI:            28.5809%
+  Decryption:      OK
+
