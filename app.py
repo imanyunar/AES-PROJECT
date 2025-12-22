@@ -410,6 +410,7 @@ def get_sbox_metrics_smart(sbox_name, sbox_array):
         
     # 2. Jika tidak ada, hitung manual (Akan lambat 1x saja, lalu masuk cache)
     return calculate_and_cache_all_metrics(sbox_array, clean_name)
+
 def get_sbox_hash(sbox):
     """Generate unique hash untuk S-box"""
     return hashlib.md5(sbox.tobytes()).hexdigest()
@@ -922,20 +923,18 @@ if page == "🏠 Home - Encryption/Decryption":
             st.session_state.decrypted_result_decimal = ''
             st.session_state.decrypted_result_text = ''
             st.rerun()
-
+    
     # ==============================
     # IMAGE ENCRYPTION (TAMBAHAN)
     # ==============================
     image_encrypt_ui_new(active_sbox, sbox_choice)
 
-    # Page: Image S-Box Comparison
+# Page: Image S-Box Comparison
 elif page == "🖼️ Image S-Box Comparison":
     sboxes = generate_sboxes(include_random=False)
     sboxes = extend_sbox_registry(sboxes)
     image_comparison_page(sboxes)
 
-# Page: S-Box Comparison
-# In S-Box Comparison page
 # Page: S-Box Comparison
 elif page == "📊 S-Box Comparison":
     st.header("S-Box Comparison")
@@ -1059,10 +1058,9 @@ elif page == "📊 S-Box Comparison":
             with col2:
                 st.write("")
                 st.write("")
-                if st.button("📊 Select All"):
+                if st.button("📊 Select All", key="select_all_sboxes"):
                     st.session_state.selected_all = True
                     st.rerun()
-
                 
                 if st.session_state.get('selected_all', False):
                     selected_sboxes = list(sboxes.keys())
@@ -1134,7 +1132,7 @@ elif page == "📊 S-Box Comparison":
                             file_name=f"sbox_comparison_selected_{len(selected_sboxes)}.csv",
                             mime="text/csv",
                             key="download_selected",
-                            use_column_width=True
+                            use_container_width=True
                         )
                     
                     with col2:
@@ -1146,7 +1144,7 @@ elif page == "📊 S-Box Comparison":
                             file_name=f"sbox_comparison_selected_{len(selected_sboxes)}.json",
                             mime="application/json",
                             key="download_json_selected",
-                            use_column_width=True
+                            use_container_width=True
                         )
             
             # Download all comparison
@@ -1164,7 +1162,7 @@ elif page == "📊 S-Box Comparison":
                     file_name="sbox_comparison_all.csv",
                     mime="text/csv",
                     key="download_all_csv",
-                    use_column_width=True
+                    use_container_width=True
                 )
             
             with col2:
@@ -1175,7 +1173,7 @@ elif page == "📊 S-Box Comparison":
                     file_name="sbox_comparison_all.json",
                     mime="application/json",
                     key="download_all_json",
-                    use_column_width=True
+                    use_container_width=True
                 )
             
             with col3:
@@ -1187,7 +1185,7 @@ elif page == "📊 S-Box Comparison":
                     file_name="sbox_comparison_all.tsv",
                     mime="text/tab-separated-values",
                     key="download_all_tsv",
-                    use_column_width=True
+                    use_container_width=True
                 )
         
         else:
@@ -1248,7 +1246,7 @@ elif page == "📊 S-Box Comparison":
             col1, col2, col3 = st.columns([2, 2, 1])
             
             with col1:
-                if st.button("🔄 Recalculate Selected", key="recalc_single_btn", use_column_width=True):
+                if st.button("🔄 Recalculate Selected", key="recalc_single_btn", use_container_width=True):
                     with st.spinner(f"⏳ Calculating metrics for {selected_sbox}..."):
                         sbox = sboxes[selected_sbox]
                         
@@ -1277,7 +1275,7 @@ elif page == "📊 S-Box Comparison":
             
             with col2:
                 # Recalculate all text S-boxes
-                if st.button("🔄 Recalculate All Text S-Boxes", key="recalc_text_btn", use_column_width=True):
+                if st.button("🔄 Recalculate All Text S-Boxes", key="recalc_text_btn", use_container_width=True):
                     text_sboxes = {k: v for k, v in sboxes.items() if not k.startswith("IMG-")}
                     st.info(f"⏳ Processing {len(text_sboxes)} text S-boxes...")
                     
@@ -1362,7 +1360,7 @@ elif page == "📊 S-Box Comparison":
                 col1, col2, col3 = st.columns([2, 2, 1])
                 
                 with col1:
-                    if st.button("▶️ Process Next Batch", key="process_batch_btn", use_column_width=True):
+                    if st.button("▶️ Process Next Batch", key="process_batch_btn", use_container_width=True):
                         with st.spinner(f"Processing batch {st.session_state.current_batch + 1}/{total_batches}..."):
                             progress_bar = st.progress(0)
                             status_text = st.empty()
@@ -1383,7 +1381,7 @@ elif page == "📊 S-Box Comparison":
                             st.rerun()
                 
                 with col2:
-                    if st.button("⏭️ Skip to Results", key="skip_batch_btn", use_column_width=True):
+                    if st.button("⏭️ Skip to Results", key="skip_batch_btn", use_container_width=True):
                         st.session_state.current_batch = total_batches
                         st.info("Skipped to results view")
                         st.rerun()
@@ -1396,13 +1394,13 @@ elif page == "📊 S-Box Comparison":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("🔄 Reset and Restart", use_column_width=True):
+                    if st.button("🔄 Reset and Restart", use_container_width=True):
                         st.session_state.current_batch = 0
                         st.info("Batch counter reset to 0")
                         st.rerun()
                 
                 with col2:
-                    if st.button("📊 View Results", use_column_width=True):
+                    if st.button("📊 View Results", use_container_width=True):
                         st.info("Switch to 'View Results' tab to see comparison")
         
         # === ALL AT ONCE (Original behavior) ===
@@ -1419,7 +1417,7 @@ elif page == "📊 S-Box Comparison":
             
             st.markdown("---")
             
-            if st.button("🔄 Recalculate All S-Boxes", key="recalc_all_btn", disabled=not confirm_all, use_column_width=True):
+            if st.button("🔄 Recalculate All S-Boxes", key="recalc_all_btn", disabled=not confirm_all, use_container_width=True):
                 sboxes = generate_sboxes(include_random=False)
                 
                 # Add image S-boxes
@@ -1536,7 +1534,7 @@ elif page == "📊 S-Box Comparison":
                     file_name="sbox_statistics.csv",
                     mime="text/csv",
                     key="download_stats_csv",
-                    use_column_width=True
+                    use_container_width=True
                 )
             
             with col2:
@@ -1547,14 +1545,14 @@ elif page == "📊 S-Box Comparison":
                     file_name="sbox_statistics.json",
                     mime="application/json",
                     key="download_stats_json",
-                    use_column_width=True
+                    use_container_width=True
                 )
         
         else:
             st.warning("⚠️ No statistics available.")
             st.info("💡 Please calculate S-box metrics first in the 'Recalculate Metrics' tab.")
+
 # Page: S-Box Testing
-# ================= Page: S-Box Testing =================
 elif page == "🔬 S-Box Testing":
     st.header("🔬 S-Box Quality Testing")
 
@@ -1584,7 +1582,6 @@ elif page == "🔬 S-Box Testing":
 
         st.success("✅ Test completed")
         st.json(result)
-
 
 # Page: Statistics
 elif page == "📈 Statistics":
@@ -1686,8 +1683,7 @@ elif page == "🔍 S-Box Viewer":
             file_name=f"{sbox_name.replace('📝 ', '').replace('🖼️ ', '')}_sbox_{display_format.lower()}.csv",
             mime="text/csv",
             key="download_csv",
-            width='stretch'  # or width='stretch' for latest Streamlit
-
+            use_container_width=True
         )
     
     with col2:
