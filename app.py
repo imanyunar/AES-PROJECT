@@ -1059,9 +1059,10 @@ elif page == "📊 S-Box Comparison":
             with col2:
                 st.write("")
                 st.write("")
-                if st.button("📊 Select All", use_column_width=True):
+                if st.button("📊 Select All"):
                     st.session_state.selected_all = True
                     st.rerun()
+
                 
                 if st.session_state.get('selected_all', False):
                     selected_sboxes = list(sboxes.keys())
