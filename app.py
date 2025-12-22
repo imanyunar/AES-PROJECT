@@ -352,6 +352,57 @@ def save_metrics_to_file():
         st.error(f"Error saving metrics file: {e}")
         return False
 
+# --- FUNGSI OPTIMASI: Tambahkan di bagian atas app.py ---
+
+@st.cache_data
+def load_all_metrics_json():
+    """Membaca file JSON hasil pre-kalkulasi"""
+    import json
+    from pathlib import Path
+    path = Path("sbox_results.json")
+    if path.exists():
+        with open(path, 'r') as f:
+            try:
+                return json.load(f)
+            except:
+                return {}
+    return {}
+
+@st.cache_data
+def calculate_and_cache_all_metrics(sbox_array, name):
+    """Fallback: Hitung manual 8 metrik jika tidak ada di JSON"""
+    from sbox_utils import (
+        balance, bijective, nonlinearity, sac, 
+        bic_sac_fast, bic_nl_fast, lap, dap
+    )
+    
+    # Pastikan sbox dalam bentuk flat 256 elemen
+    s_flat = sbox_array.flatten() if hasattr(sbox_array, 'flatten') else np.array(sbox_array).flatten()
+    
+    return {
+        "Balance": balance(s_flat),
+        "Bijective": bijective(s_flat),
+        "Nonlinearity": nonlinearity(s_flat),
+        "SAC": sac(s_flat),
+        "BIC-SAC": bic_sac_fast(s_flat),
+        "BIC-NL": bic_nl_fast(s_flat),
+        "LAP": lap(s_flat),
+        "DAP": dap(s_flat)
+    }
+
+def get_sbox_metrics_smart(sbox_name, sbox_array):
+    """Fungsi Utama: Cek JSON dulu, baru hitung manual"""
+    all_data_json = load_all_metrics_json()
+    
+    # Bersihkan nama dari emoji agar cocok dengan kunci di JSON
+    clean_name = sbox_name.replace('📝 ', '').replace('🖼️ ', '').strip()
+    
+    # 1. Jika ada di JSON, ambil (Instan)
+    if clean_name in all_data_json:
+        return all_data_json[clean_name]
+        
+    # 2. Jika tidak ada, hitung manual (Akan lambat 1x saja, lalu masuk cache)
+    return calculate_and_cache_all_metrics(sbox_array, clean_name)
 def get_sbox_hash(sbox):
     """Generate unique hash untuk S-box"""
     return hashlib.md5(sbox.tobytes()).hexdigest()
@@ -525,9 +576,9 @@ def calculate_std_metrics(sboxes_dict=None):
     return std_results
 
 def display_metrics(metrics, from_cache=False):
-    """Display metrics with progress bars"""
+    """Fungsi standar untuk menampilkan progress bar (Versi Lama)"""
     if from_cache:
-        st.info("📦 Using cached metrics")
+        st.info("📦 Menggunakan metrik dari cache")
     
     for key, value in metrics.items():
         col1, col2 = st.columns([1, 3])
@@ -537,9 +588,44 @@ def display_metrics(metrics, from_cache=False):
             if key in ["Balance", "Bijective"]:
                 st.write("✅ Pass" if value else "❌ Fail")
             else:
-                progress = calculate_progress_width(key, value) / 100
-                st.progress(progress)
+                # Menghitung lebar progress bar
+                progress = 0
+                try:
+                    if "NL" in key or "Nonlinearity" in key: progress = float(value) / 112
+                    elif "SAC" in key: progress = float(value)
+                    elif "LAP" in key or "DAP" in key: progress = 1 - float(value)
+                except: progress = 0.5
+                
+                st.progress(min(max(progress, 0.0), 1.0))
                 st.write(f"{value}")
+
+def display_metrics_8_lengkap(res):
+    """Fungsi baru untuk menampilkan 8 metrik secara mendetail (Versi Upgrade)"""
+    st.markdown("#### 📊 Ringkasan Metrik S-Box")
+    m1, m2, m3, m4 = st.columns(4)
+    # Mengambil data dengan fallback jika nama kunci berbeda
+    nl_val = res.get("Nonlinearity") or res.get("NL", "N/A")
+    sac_val = res.get("SAC", 0)
+    bic_nl = res.get("BIC-NL", "N/A")
+    bic_sac = res.get("BIC-SAC", 0)
+
+    m1.metric("Nonlinearity", nl_val)
+    m2.metric("SAC", f"{sac_val:.4f}")
+    m3.metric("BIC-NL", bic_nl)
+    m4.metric("BIC-SAC", f"{bic_sac:.4f}")
+
+    with st.expander("🔍 Detail Hasil Pengujian Lengkap"):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.write(f"**⚖️ Balance State:** {'✅ Pass' if res.get('Balance') else '❌ Fail'}")
+            st.write(f"**🔄 Bijective State:** {'✅ Pass' if res.get('Bijective') else '❌ Fail'}")
+            st.write(f"**📈 Nonlinearity:** {nl_val}")
+            st.write(f"**🎯 SAC:** {sac_val:.6f}")
+        with col_b:
+            st.write(f"**🧬 BIC-SAC:** {bic_sac:.6f}")
+            st.write(f"**🧩 BIC-NL:** {bic_nl}")
+            st.write(f"**📉 LAP:** {res.get('LAP', 0):.6f}")
+            st.write(f"**📊 DAP:** {res.get('DAP', 0):.6f}")
 
 # Load metrics on startup
 if 'metrics_loaded' not in st.session_state:

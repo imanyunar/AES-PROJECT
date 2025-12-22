@@ -1,0 +1,90 @@
+[
+    {
+        "S-box": "A0",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 119,
+        "SAC": 0.5078125,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5009765625,
+        "BIC-NL": 118.0
+    },
+    {
+        "S-box": "A1",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 120,
+        "SAC": 0.498046875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.50537109375,
+        "BIC-NL": 119.0
+    },
+    {
+        "S-box": "A2",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 120,
+        "SAC": 0.498046875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.50537109375,
+        "BIC-NL": 119.0
+    },
+    {
+        "S-box": "K4",
+        "Balance": true,
+        "Bijective": false,
+        "NL": 119,
+        "SAC": 0.509765625,
+        "LAP": 0.00390625,
+        "DAP": 0.0234375,
+        "BIC-SAC": 0.49930245535714285,
+        "BIC-NL": 118.0
+    },
+    {
+        "S-box": "K44",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 118,
+        "SAC": 0.500732421875,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.49769810267857145,
+        "BIC-NL": 118.0
+    },
+    {
+        "S-box": "K128",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 120,
+        "SAC": 0.493896484375,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.5028599330357143,
+        "BIC-NL": 119.0
+    },
+    {
+        "S-box": "AES",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 118,
+        "SAC": 0.5048828125,
+        "LAP": 0.00390625,
+        "DAP": 0.015625,
+        "BIC-SAC": 0.4995814732142857,
+        "BIC-NL": 118.0
+    },
+    {
+        "S-box": "RANDOM",
+        "Balance": true,
+        "Bijective": true,
+        "NL": 120,
+        "SAC": 0.509033203125,
+        "LAP": 0.0244140625,
+        "DAP": 0.046875,
+        "BIC-SAC": 0.5044642857142857,
+        "BIC-NL": 116.0
+    }
+]
