@@ -452,14 +452,18 @@ def sbox_metrics(sbox, sbox_name="default", force_recalculate=False):
         "CI": correlation_immunity(sbox, max_order=3)
     }
 
+    # convert numpy → python native
     metrics_serializable = {
-        k: float(v) if isinstance(v, (np.integer, np.floating)) else bool(v) if isinstance(v, np.bool_) else v
+        k: float(v) if isinstance(v, (np.integer, np.floating))
+        else bool(v) if isinstance(v, np.bool_)
+        else v
         for k, v in metrics.items()
     }
 
     st.session_state.metrics_by_name[sbox_name] = metrics_serializable
 
     return metrics_serializable, True
+
 
 def display_metrics_12_complete(metrics, from_cache=False):
     """Display ALL 12 metrics in organized format"""
