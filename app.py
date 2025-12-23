@@ -273,7 +273,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Path untuk file hasil metrics
-METRICS_FILE = Path(__file__).parent / 'sbox_results.json'
+METRICS_FILE = Path(__file__).parent / 'all_sbox_results.json'
 
 # Initialize session state
 if 'metrics_cache' not in st.session_state:

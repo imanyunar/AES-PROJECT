@@ -418,12 +418,53 @@ if __name__ == "__main__":
         print(f"{'TO':<15} {res['TO']:.6f}{'':>14} {'Lebih rendah lebih baik'}")
         print(f"{'CI':<15} {res['CI']:<20} {'Order immunity (0-3)'}")
 
-    # Simpan hasil
+    # Simpan hasil ke JSON
     with open("all_sbox_results.json", "w") as f:
         json.dump(results, f, indent=4)
 
     print("\n" + "="*70)
-    print("✅ Semua hasil disimpan ke all_sbox_results.json")
+    print("✅ Hasil disimpan ke all_sbox_results.json")
+    
+    # Simpan hasil ke CSV menggunakan pandas untuk format yang lebih baik
+    import pandas as pd
+    csv_filename = "all_sbox_results.csv"
+    excel_filename = "all_sbox_results.xlsx"
+    
+    if results:
+        df = pd.DataFrame(results)
+        
+        # Format numeric columns untuk readability
+        numeric_cols = ['SAC', 'LAP', 'DAP', 'BIC-SAC', 'TO']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = df[col].round(8)
+        
+        # Export CSV
+        df.to_csv(csv_filename, index=False)
+        print(f"✅ Hasil disimpan ke {csv_filename}")
+        
+        # Export Excel dengan formatting
+        try:
+            with pd.ExcelWriter(excel_filename, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='S-Box Metrics', index=False)
+                
+                # Auto-adjust column width
+                worksheet = writer.sheets['S-Box Metrics']
+                for idx, col in enumerate(df.columns):
+                    max_length = max(
+                        df[col].astype(str).apply(len).max(),
+                        len(col)
+                    ) + 2
+                    worksheet.column_dimensions[chr(65 + idx)].width = min(max_length, 20)
+            
+            print(f"✅ Hasil disimpan ke {excel_filename}")
+        except ImportError:
+            print(f"⚠️  openpyxl tidak tersedia, skip Excel export")
+        
+        # Preview CSV
+        print("\n📊 Preview Data (5 baris pertama):")
+        print(df.head().to_string(index=False))
+    
     print("="*70)
     
     # Tabel perbandingan lengkap
