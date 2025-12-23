@@ -438,6 +438,7 @@ def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
     if not force_recalculate and sbox_hash in st.session_state.metrics_cache:
         return st.session_state.metrics_cache[sbox_hash], True
     
+    # Calculate ALL 12 metrics (TAMBAHKAN 4 METRIK BARU)
     metrics = {
         "Balance": balance(sbox),
         "Bijective": bijective(sbox),
@@ -447,12 +448,13 @@ def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
         "DAP": dap(sbox),
         "BIC-SAC": bic_sac_fast(sbox),
         "BIC-NL": bic_nl_fast(sbox),
-        "DU": differential_uniformity(sbox),
-        "AD": algebraic_degree(sbox),
-        "TO": transparency_order(sbox),
-        "CI": correlation_immunity(sbox, max_order=3)
+        "DU": differential_uniformity(sbox),      # BARU
+        "AD": algebraic_degree(sbox),             # BARU
+        "TO": transparency_order(sbox),           # BARU
+        "CI": correlation_immunity(sbox, max_order=3)  # BARU
     }
     
+    # Convert numpy types to Python native types
     metrics_serializable = {}
     for key, value in metrics.items():
         if isinstance(value, (np.integer, np.floating)):
@@ -467,7 +469,67 @@ def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
         st.session_state.metrics_by_name[sbox_name] = metrics_serializable
     
     return metrics_serializable, False
-
+def display_metrics_12_complete(metrics, from_cache=False):
+    """Display ALL 12 metrics in organized format"""
+    if from_cache:
+        st.info("📦 Using cached metrics")
+    
+    st.markdown("#### 📊 Complete S-Box Metrics (12 Parameters)")
+    
+    # Row 1: 4 primary metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        nl_val = metrics.get("NL", 0)
+        st.metric("Nonlinearity (NL)", nl_val, help="Higher is better (max 112)")
+    with col2:
+        sac_val = metrics.get("SAC", 0)
+        st.metric("SAC", f"{sac_val:.4f}", help="Closer to 0.5 is better")
+    with col3:
+        bic_nl = metrics.get("BIC-NL", 0)
+        st.metric("BIC-NL", bic_nl, help="Bit Independence NL")
+    with col4:
+        bic_sac = metrics.get("BIC-SAC", 0)
+        st.metric("BIC-SAC", f"{bic_sac:.4f}", help="Bit Independence SAC")
+    
+    # Row 2: 4 NEW metrics
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        du_val = metrics.get("DU", 0)
+        st.metric("DU", du_val, help="Differential Uniformity (≤4 excellent)")
+    with col2:
+        ad_val = metrics.get("AD", 0)
+        st.metric("AD", ad_val, help="Algebraic Degree (=7 optimal)")
+    with col3:
+        to_val = metrics.get("TO", 0)
+        st.metric("TO", f"{to_val:.4f}", help="Transparency Order (lower better)")
+    with col4:
+        ci_val = metrics.get("CI", 0)
+        st.metric("CI", ci_val, help="Correlation Immunity (0-3)")
+    
+    # Expandable detailed view
+    with st.expander("🔍 Detailed Metrics Breakdown (12 Total)"):
+        col_a, col_b, col_c = st.columns(3)
+        
+        with col_a:
+            st.write("**Basic Properties:**")
+            st.write(f"⚖️ Balance: {'✅ Pass' if metrics.get('Balance') else '❌ Fail'}")
+            st.write(f"🔄 Bijective: {'✅ Pass' if metrics.get('Bijective') else '❌ Fail'}")
+            st.write(f"📈 NL: {metrics.get('NL', 0)}")
+            st.write(f"🎯 SAC: {metrics.get('SAC', 0):.6f}")
+        
+        with col_b:
+            st.write("**Bit Independence:**")
+            st.write(f"🧬 BIC-SAC: {metrics.get('BIC-SAC', 0):.6f}")
+            st.write(f"🧩 BIC-NL: {metrics.get('BIC-NL', 0)}")
+            st.write(f"📉 LAP: {metrics.get('LAP', 0):.6f}")
+            st.write(f"📊 DAP: {metrics.get('DAP', 0):.6f}")
+        
+        with col_c:
+            st.write("**Advanced Cryptographic:**")
+            st.write(f"🔢 DU: {metrics.get('DU', 0)}")
+            st.write(f"🧮 AD: {metrics.get('AD', 0)}")
+            st.write(f"🔬 TO: {metrics.get('TO', 0):.6f}")
+            st.write(f"🛡️ CI: {metrics.get('CI', 0)}")
 def calculate_progress_width(key, value):
     """Hitung width progress bar untuk setiap metric"""
     try:
@@ -492,9 +554,26 @@ def get_metric_score(key, value):
         elif key == "NL" or key == "BIC-NL":
             return round((float(value) / 112) * 100)
         elif key in ["SAC", "BIC-SAC"]:
-            return round(float(value) * 100)
+            return round(max(0, 100 - abs(float(value) - 0.5) * 200))
         elif key in ["LAP", "DAP"]:
             return round((1 - float(value)) * 100)
+        # TAMBAHAN BARU UNTUK 4 METRIK
+        elif key == "DU":
+            # DU: ≤4 excellent (100%), >4 decreases
+            val = float(value)
+            if val <= 4:
+                return 100
+            else:
+                return max(0, 100 - (val - 4) * 25)
+        elif key == "AD":
+            # AD: =7 optimal (100%)
+            return round((float(value) / 7) * 100)
+        elif key == "TO":
+            # TO: lower is better, normalize around typical range
+            return max(0, min(100, 100 - float(value) * 100))
+        elif key == "CI":
+            # CI: higher is better (0-3 range)
+            return round((float(value) / 3) * 100)
         else:
             return 50
     except:
@@ -601,29 +680,7 @@ def calculate_std_metrics(sboxes_dict=None):
     
     return std_results
 
-def display_metrics(metrics, from_cache=False):
-    """Fungsi standar untuk menampilkan progress bar (Versi Lama)"""
-    if from_cache:
-        st.info("📦 Menggunakan metrik dari cache")
-    
-    for key, value in metrics.items():
-        col1, col2 = st.columns([1, 3])
-        with col1:
-            st.write(f"**{key}:**")
-        with col2:
-            if key in ["Balance", "Bijective"]:
-                st.write("✅ Pass" if value else "❌ Fail")
-            else:
-                # Menghitung lebar progress bar
-                progress = 0
-                try:
-                    if "NL" in key or "Nonlinearity" in key: progress = float(value) / 112
-                    elif "SAC" in key: progress = float(value)
-                    elif "LAP" in key or "DAP" in key: progress = 1 - float(value)
-                except: progress = 0.5
-                
-                st.progress(min(max(progress, 0.0), 1.0))
-                st.write(f"{value}")
+
 
 def display_metrics_12_lengkap(res):
     """Fungsi baru untuk menampilkan 12 metrik secara mendetail (Versi Upgrade dengan DU, AD, TO, CI)"""
@@ -751,6 +808,7 @@ if page == "🏠 Home - Encryption/Decryption":
                 with st.spinner("Recalculating..."):
                     active_sbox = sboxes[sbox_choice]
                     metrics, _ = sbox_metrics(active_sbox, sbox_name=sbox_choice, force_recalculate=True)
+                    save_metrics_to_file()
                     st.success("✅ Metrics recalculated!")
     
     # Custom S-box input (sisanya tetap sama)
@@ -816,7 +874,7 @@ if page == "🏠 Home - Encryption/Decryption":
                 with st.spinner("Calculating metrics..."):
                     metrics, from_cache = sbox_metrics(active_sbox, sbox_name=sbox_choice, force_recalculate=False)
                 st.success("✅ Metrics loaded")
-                display_metrics(metrics, from_cache)
+                display_metrics_12_complete(metrics, from_cache)
                 
                 if st.button("🗑️ Hide Metrics", key="hide_metrics_btn"):
                     st.session_state.show_sbox_metrics = False
@@ -1111,20 +1169,20 @@ elif page == "📊 S-Box Comparison":
             # Format and display main table
             st.markdown("#### 🏆 Complete Comparison Table (Ranked) - All 12 Metrics")
             st.dataframe(df.style.format({
-                'Overall Score': '{:.2f}',
-                'NL': '{:.0f}',
-                'SAC': '{:.4f}',
-                'LAP': '{:.6f}',
-                'DAP': '{:.6f}',
-                'BIC-SAC': '{:.4f}',
-                'BIC-NL': '{:.0f}',
-                'DU': '{:.0f}',
-                'AD': '{:.0f}',
-                'TO': '{:.6f}',
-                'CI': '{:.0f}'
-            }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'), 
-            use_container_width=True,
-            height=400)
+                    'Overall Score': '{:.2f}',
+                    'NL': '{:.0f}',
+                    'SAC': '{:.4f}',
+                    'LAP': '{:.6f}',
+                    'DAP': '{:.6f}',
+                    'BIC-SAC': '{:.4f}',
+                    'BIC-NL': '{:.0f}',
+                    'DU': '{:.0f}',
+                    'AD': '{:.0f}',
+                    'TO': '{:.6f}',
+                    'CI': '{:.0f}'
+                }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'), 
+                use_container_width=True,
+                height=400)
             
             st.markdown("---")
             
@@ -1244,39 +1302,41 @@ elif page == "📊 S-Box Comparison":
     else:
         st.info("📊 Click **'Show Comparison Table'** or **'Calculate'** buttons above to see results")
 
-# Page: S-Box Testing - WITH PROPER TABLE AND HISTOGRAMS
+# ============================
+# Page: S-Box Testing
+# ============================
 elif page == "🔬 S-Box Testing":
     st.header("🔬 S-Box Quality Testing")
 
-    # Generate sboxes
+    # ----------------------------
+    # Generate S-Boxes
+    # ----------------------------
     sboxes = generate_sboxes(include_random=False)
-    
-    # Add image S-boxes
+
     try:
         from image_crypto import test_image_sboxes
-        image_sboxes_dict = test_image_sboxes()
-        for name, sbox in image_sboxes_dict.items():
-            sboxes[f"IMG-{name}"] = sbox
+        img_boxes = test_image_sboxes()
+        for name, sb in img_boxes.items():
+            sboxes[f"IMG-{name}"] = sb
     except Exception as e:
         st.warning(f"⚠️ Could not load image S-boxes: {e}")
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        sbox_name = st.selectbox(
-            "Select S-Box for Testing",
-            list(sboxes.keys())
-        )
-    
+        sbox_name = st.selectbox("Select S-Box for Testing", list(sboxes.keys()))
     with col2:
         st.write("")
         st.write("")
         test_button = st.button("🧪 Run Test", use_container_width=True)
 
+    # ============================
+    # RUN TEST
+    # ============================
     if test_button:
         with st.spinner(f"Testing {sbox_name}..."):
             s = sboxes[sbox_name]
 
-            # Calculate all metrics
+            # -------- METRICS --------
             result = {
                 "Balance": balance(s),
                 "Bijective": bijective(s),
@@ -1285,64 +1345,61 @@ elif page == "🔬 S-Box Testing":
                 "LAP": lap(s),
                 "DAP": dap(s),
                 "BIC-SAC": bic_sac_fast(s),
-                "BIC-NL": bic_nl_fast(s)
+                "BIC-NL": bic_nl_fast(s),
+                "DU": differential_uniformity(s),
+                "AD": algebraic_degree(s),
+                "TO": transparency_order(s),
+                "CI": correlation_immunity(s, max_order=3)
             }
-            
-            # Convert numpy types
+
+            # -------- Clean numpy --------
             result_clean = {}
-            for key, value in result.items():
-                if isinstance(value, (np.integer, np.floating)):
-                    result_clean[key] = float(value)
-                elif isinstance(value, np.bool_):
-                    result_clean[key] = bool(value)
+            for k, v in result.items():
+                if isinstance(v, (np.integer, np.floating)):
+                    result_clean[k] = float(v)
+                elif isinstance(v, np.bool_):
+                    result_clean[k] = bool(v)
                 else:
-                    result_clean[key] = value
+                    result_clean[k] = v
 
         st.success(f"✅ Test completed for **{sbox_name}**")
-        
         st.markdown("---")
-        
-        # METRICS CARDS
-        st.subheader("📊 Test Results Summary")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            status = "✅ Pass" if result_clean['Balance'] else "❌ Fail"
-            st.metric("Balance", status)
-        
-        with col2:
-            status = "✅ Pass" if result_clean['Bijective'] else "❌ Fail"
-            st.metric("Bijective", status)
-        
-        with col3:
-            st.metric("NL", f"{result_clean['NL']:.2f}")
-        
-        with col4:
-            st.metric("SAC", f"{result_clean['SAC']:.4f}")
-        
+
+        # ============================
+        # SUMMARY CARDS
+        # ============================
+        st.subheader("📊 Test Results Summary (12 Metrics)")
+
+        # Row 1: Basic
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Balance", "✅ Pass" if result_clean['Balance'] else "❌ Fail")
+        c2.metric("Bijective", "✅ Pass" if result_clean['Bijective'] else "❌ Fail")
+        c3.metric("NL", f"{result_clean['NL']:.2f}")
+        c4.metric("SAC", f"{result_clean['SAC']:.4f}")
+
         st.markdown("")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("BIC-NL", f"{result_clean['BIC-NL']:.2f}")
-        
-        with col2:
-            st.metric("BIC-SAC", f"{result_clean['BIC-SAC']:.4f}")
-        
-        with col3:
-            st.metric("LAP", f"{result_clean['LAP']:.6f}")
-        
-        with col4:
-            st.metric("DAP", f"{result_clean['DAP']:.6f}")
-        
-        st.markdown("---")
-        
+
+        # Row 2: Bit Independence
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("BIC-NL", f"{result_clean['BIC-NL']:.2f}")
+        c2.metric("BIC-SAC", f"{result_clean['BIC-SAC']:.4f}")
+        c3.metric("LAP", f"{result_clean['LAP']:.6f}")
+        c4.metric("DAP", f"{result_clean['DAP']:.6f}")
+
+        st.markdown("")
+
+        # Row 3: Advanced
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("DU", result_clean['DU'], help="Differential Uniformity")
+        c2.metric("AD", result_clean['AD'], help="Algebraic Degree")
+        c3.metric("TO", f"{result_clean['TO']:.4f}", help="Transparency Order")
+        c4.metric("CI", result_clean['CI'], help="Correlation Immunity")
+
+        # ============================
         # DETAILED TABLE
+        # ============================
         st.subheader("📋 Detailed Metrics Table")
-        
-        metrics_data = []
+
         ideal_values = {
             'Balance': ('True', 'boolean', 'Must be balanced'),
             'Bijective': ('True', 'boolean', 'Must be bijective'),
@@ -1351,201 +1408,135 @@ elif page == "🔬 S-Box Testing":
             'LAP': ('0.0625', 'lower', 'Lower is better'),
             'DAP': ('0.015625', 'lower', 'Lower is better'),
             'BIC-SAC': ('0.5', 'closer', 'Closer to 0.5 is better'),
-            'BIC-NL': ('112', 'higher', 'Higher is better')
+            'BIC-NL': ('112', 'higher', 'Higher is better'),
+            'DU': ('4', 'lower', '≤4 is excellent'),
+            'AD': ('7', 'equals', '=7 is optimal'),
+            'TO': ('0.5', 'lower', 'Lower is better'),
+            'CI': ('3', 'higher', 'Higher is better')
         }
-        
+
+        rows = []
+
         for metric, value in result_clean.items():
-            ideal, comp_type, description = ideal_values.get(metric, ('N/A', 'N/A', 'N/A'))
-            
-            # Determine status
-            if comp_type == 'boolean':
-                status = "✅ Pass" if value else "❌ Fail"
+            ideal, comp, desc = ideal_values[metric]
+
+            if comp == 'boolean':
                 score = 100 if value else 0
-            elif comp_type == 'higher':
+                status = "✅ Pass" if value else "❌ Fail"
+
+            elif comp == 'higher':
+                score = min(100, value / float(ideal) * 100)
+                status = "✅ Excellent" if score >= 100 else "🟢 Good" if score >= 90 else "🟡 Acceptable"
+
+            elif comp == 'closer':
+                diff = abs(value - float(ideal))
+                score = max(0, 100 - diff * 1000)
+                status = "✅ Excellent" if diff < 0.01 else "🟢 Good" if diff < 0.02 else "🟡 Needs Improvement"
+
+            elif comp == 'lower':
                 ideal_num = float(ideal)
-                score = min(100, (value / ideal_num) * 100)
-                if score >= 100:
-                    status = "✅ Excellent"
-                elif score >= 90:
-                    status = "🟢 Good"
-                else:
-                    status = "🟡 Acceptable"
-            elif comp_type == 'closer':
-                ideal_num = float(ideal)
-                deviation = abs(value - ideal_num)
-                score = max(0, 100 - (deviation * 1000))
-                if deviation < 0.01:
-                    status = "✅ Excellent"
-                elif deviation < 0.02:
-                    status = "🟢 Good"
-                else:
-                    status = "🟡 Needs Improvement"
-            elif comp_type == 'lower':
-                ideal_num = float(ideal)
-                if value <= ideal_num:
-                    status = "✅ Excellent"
-                    score = 100
-                else:
-                    score = max(0, 100 - ((value - ideal_num) / ideal_num * 100))
-                    if value <= ideal_num * 1.2:
-                        status = "🟢 Acceptable"
-                    else:
-                        status = "🟡 Needs Improvement"
+                score = 100 if value <= ideal_num else max(0, 100 - ((value - ideal_num) / ideal_num * 100))
+                status = "✅ Excellent" if value <= ideal_num else "🟡 Needs Improvement"
+
+            elif comp == 'equals':
+                diff = abs(value - float(ideal))
+                score = max(0, 100 - diff * 15)
+                status = "✅ Excellent" if diff < 1e-6 else "🟢 Good" if diff <= 1 else "🟡 Acceptable"
+
             else:
-                status = "N/A"
                 score = 0
-            
-            metrics_data.append({
-                'Metric': metric,
-                'Value': value if isinstance(value, bool) else f"{value:.6f}",
-                'Ideal': ideal,
-                'Status': status,
-                'Score': f"{score:.1f}%",
-                'Description': description
+                status = "N/A"
+
+            rows.append({
+                "Metric": metric,
+                "Value": value if isinstance(value, bool) else f"{value:.6f}" if isinstance(value, float) else value,
+                "Ideal": ideal,
+                "Status": status,
+                "Score": f"{score:.1f}%",
+                "Description": desc
             })
-        
-        df_metrics = pd.DataFrame(metrics_data)
-        st.dataframe(df_metrics, use_container_width=True, hide_index=True)
-        
+
+        df = pd.DataFrame(rows)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+        # ============================
+        # VISUALIZATION
+        # ============================
         st.markdown("---")
-        
-        # HISTOGRAMS
         st.subheader("📊 Metrics Visualization")
-        
+
         col1, col2 = st.columns(2)
-        
         with col1:
-            st.write("**Nonlinearity Metrics**")
-            nl_data = pd.DataFrame({
-                'Metric': ['NL', 'BIC-NL'],
-                'Value': [result_clean['NL'], result_clean['BIC-NL']]
-            })
-            st.bar_chart(nl_data.set_index('Metric'))
-        
+            st.bar_chart(pd.DataFrame({
+                "Value": [result_clean['NL'], result_clean['BIC-NL']]
+            }, index=["NL", "BIC-NL"]))
+
         with col2:
-            st.write("**SAC Metrics**")
-            sac_data = pd.DataFrame({
-                'Metric': ['SAC', 'BIC-SAC'],
-                'Value': [result_clean['SAC'], result_clean['BIC-SAC']]
-            })
-            st.bar_chart(sac_data.set_index('Metric'))
-        
+            st.bar_chart(pd.DataFrame({
+                "Value": [result_clean['SAC'], result_clean['BIC-SAC']]
+            }, index=["SAC", "BIC-SAC"]))
+
         col1, col2 = st.columns(2)
-        
         with col1:
-            st.write("**Approximation Probabilities**")
-            ap_data = pd.DataFrame({
-                'Metric': ['LAP', 'DAP'],
-                'Value': [result_clean['LAP'], result_clean['DAP']]
-            })
-            st.bar_chart(ap_data.set_index('Metric'))
-        
-        with col2:
-            st.write("**Overall Score**")
-            # Calculate overall score
-            scores = []
-            for metric, value in result_clean.items():
-                if metric in ['Balance', 'Bijective']:
-                    scores.append(100 if value else 0)
-                elif metric in ['NL', 'BIC-NL']:
-                    scores.append(min(100, (value / 112) * 100))
-                elif metric in ['SAC', 'BIC-SAC']:
-                    deviation = abs(value - 0.5)
-                    scores.append(max(0, 100 - (deviation * 1000)))
-                elif metric == 'LAP':
-                    scores.append(100 if value <= 0.0625 else max(0, 100 - ((value - 0.0625) / 0.0625 * 100)))
-                elif metric == 'DAP':
-                    scores.append(100 if value <= 0.015625 else max(0, 100 - ((value - 0.015625) / 0.015625 * 100)))
-            
-            overall_score = sum(scores) / len(scores)
-            
-            score_data = pd.DataFrame({
-                'Category': ['Score', 'Remaining'],
-                'Percentage': [overall_score, 100 - overall_score]
-            })
-            st.bar_chart(score_data.set_index('Category'))
-            
-            # Grade
-            if overall_score >= 90:
-                grade = "A+"
-                emoji = "🏆"
-            elif overall_score >= 80:
-                grade = "A"
-                emoji = "🥇"
-            elif overall_score >= 70:
-                grade = "B"
-                emoji = "🥈"
-            elif overall_score >= 60:
-                grade = "C"
-                emoji = "🥉"
-            else:
-                grade = "D"
-                emoji = "📊"
-            
-            st.metric(f"{emoji} Grade", f"{grade} ({overall_score:.1f}%)")
-        
+            st.bar_chart(pd.DataFrame({
+                "Value": [result_clean['LAP'], result_clean['DAP']]
+            }, index=["LAP", "DAP"]))
+
+        # ============================
+        # OVERALL SCORE
+        # ============================
+        scores = []
+        for m, v in result_clean.items():
+            if m in ['Balance', 'Bijective']:
+                scores.append(100 if v else 0)
+            elif m in ['NL', 'BIC-NL']:
+                scores.append(min(100, v / 112 * 100))
+            elif m in ['SAC', 'BIC-SAC']:
+                scores.append(max(0, 100 - abs(v - 0.5) * 1000))
+            elif m == 'LAP':
+                scores.append(100 if v <= 0.0625 else max(0, 100 - ((v - 0.0625) / 0.0625 * 100)))
+            elif m == 'DAP':
+                scores.append(100 if v <= 0.015625 else max(0, 100 - ((v - 0.015625) / 0.015625 * 100)))
+
+        overall_score = sum(scores) / len(scores)
+
+        grade, emoji = (
+            ("A+", "🏆") if overall_score >= 90 else
+            ("A", "🥇") if overall_score >= 80 else
+            ("B", "🥈") if overall_score >= 70 else
+            ("C", "🥉") if overall_score >= 60 else
+            ("D", "📊")
+        )
+
+        st.metric(f"{emoji} Overall Grade", f"{grade} ({overall_score:.1f}%)")
+
+        # ============================
+        # DOWNLOADS
+        # ============================
         st.markdown("---")
-        
-        # DOWNLOAD OPTIONS
         st.subheader("📥 Download Test Results")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            csv_buffer = io.StringIO()
-            df_metrics.to_csv(csv_buffer, index=False)
-            st.download_button(
-                label="📄 CSV",
-                data=csv_buffer.getvalue(),
-                file_name=f"{sbox_name}_test_results.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        
-        with col2:
-            json_data = {
-                'sbox_name': sbox_name,
-                'test_date': str(pd.Timestamp.now()),
-                'metrics': result_clean,
-                'overall_score': overall_score,
-                'grade': grade
-            }
-            st.download_button(
-                label="📋 JSON",
-                data=json.dumps(json_data, indent=4),
-                file_name=f"{sbox_name}_test_results.json",
-                mime="application/json",
-                use_container_width=True
-            )
-        
-        with col3:
-            report = f"""S-BOX QUALITY TEST REPORT
-{'=' * 50}
 
-S-Box: {sbox_name}
-Date: {pd.Timestamp.now()}
-Overall Score: {overall_score:.2f}%
-Grade: {grade}
+        c1, c2, c3 = st.columns(3)
 
-{'=' * 50}
-METRICS:
-{'=' * 50}
+        with c1:
+            csv = df.to_csv(index=False)
+            st.download_button("📄 CSV", csv, f"{sbox_name}_results.csv", "text/csv", use_container_width=True)
 
-"""
-            for _, row in df_metrics.iterrows():
-                report += f"{row['Metric']}: {row['Value']}\n"
-                report += f"  Ideal: {row['Ideal']}\n"
-                report += f"  Status: {row['Status']}\n"
-                report += f"  Score: {row['Score']}\n"
-                report += f"  {row['Description']}\n\n"
-            
-            st.download_button(
-                label="📝 Report (TXT)",
-                data=report,
-                file_name=f"{sbox_name}_report.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+        with c2:
+            json_data = json.dumps({
+                "sbox": sbox_name,
+                "metrics": result_clean,
+                "overall_score": overall_score,
+                "grade": grade
+            }, indent=4)
+            st.download_button("📋 JSON", json_data, f"{sbox_name}_results.json", "application/json", use_container_width=True)
+
+        with c3:
+            report = f"S-BOX REPORT\n{'='*40}\nS-Box: {sbox_name}\nScore: {overall_score:.2f}%\nGrade: {grade}\n\n"
+            for _, r in df.iterrows():
+                report += f"{r['Metric']} → {r['Status']} ({r['Score']})\n"
+            st.download_button("📝 TXT", report, f"{sbox_name}_report.txt", "text/plain", use_container_width=True)
+
 
 # Page: Statistics
 elif page == "📈 Statistics":
