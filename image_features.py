@@ -45,15 +45,15 @@ def image_encrypt_ui(active_sbox, sbox_choice):
 
     col1, col2 = st.columns(2)
     with col1:
-        st.image(image, caption="Original Image", use_column_width=True)
+        st.image(image, caption="Original Image")
 
     encrypted = encrypt_image(image, active_sbox)
 
     with col2:
-        st.image(encrypted, caption="Encrypted Image", use_column_width=True)
+        st.image(encrypted, caption="Encrypted Image")
 
     decrypted = decrypt_image(encrypted, active_sbox)
-    st.image(decrypted, caption="Decrypted Image", use_column_width=True)
+    st.image(decrypted, caption="Decrypted Image")
 
     # ================= Metrics =================
     st.subheader("📊 Image Encryption Metrics")
@@ -127,7 +127,7 @@ def image_comparison_page():
 
     df = pd.DataFrame(results)
 
-    st.dataframe(df, use_column_width=True)
+    st.dataframe(df)
 
     csv_buf = io.StringIO()
     df.to_csv(csv_buf, index=False)

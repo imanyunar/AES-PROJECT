@@ -1195,7 +1195,6 @@ elif page == "📊 S-Box Comparison":
                     'TO': '{:.6f}',
                     'CI': '{:.0f}'
                 }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'), 
-                use_column_width=True,
                 height=400)
             
             st.markdown("---")
@@ -1246,8 +1245,7 @@ elif page == "📊 S-Box Comparison":
                         'DAP': '{:.6f}',
                         'BIC-SAC': '{:.4f}',
                         'BIC-NL': '{:.2f}'
-                    }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'), 
-                    use_column_width=True)
+                    }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'))
                     
                     # Charts
                     st.markdown("---")
@@ -1286,8 +1284,7 @@ elif page == "📊 S-Box Comparison":
                     label=f"📄 CSV ({len(df)} S-Boxes)",
                     data=csv_buffer.getvalue(),
                     file_name="sbox_comparison_all.csv",
-                    mime="text/csv",
-                    use_column_width=True
+                    mime="text/csv"
                 )
             
             with col2:
@@ -1296,8 +1293,7 @@ elif page == "📊 S-Box Comparison":
                     label="📋 JSON",
                     data=json_buffer,
                     file_name="sbox_comparison_all.json",
-                    mime="application/json",
-                    use_column_width=True
+                    mime="application/json"
                 )
             
             with col3:
@@ -1306,8 +1302,7 @@ elif page == "📊 S-Box Comparison":
                     label="📊 TSV (Excel)",
                     data=excel_data,
                     file_name="sbox_comparison_all.tsv",
-                    mime="text/tab-separated-values",
-                    use_column_width=True
+                    mime="text/tab-separated-values"
                 )
         
         else:
@@ -1471,7 +1466,7 @@ elif page == "🔬 S-Box Testing":
             })
 
         df = pd.DataFrame(rows)
-        st.dataframe(df, use_column_width=True, hide_index=True)
+        st.dataframe(df, hide_index=True)
 
         # ============================
         # VISUALIZATION
@@ -1534,7 +1529,7 @@ elif page == "🔬 S-Box Testing":
 
         with c1:
             csv = df.to_csv(index=False)
-            st.download_button("📄 CSV", csv, f"{sbox_name}_results.csv", "text/csv", use_column_width=True)
+            st.download_button("📄 CSV", csv, f"{sbox_name}_results.csv", "text/csv")
 
         with c2:
             json_data = json.dumps({
@@ -1543,13 +1538,13 @@ elif page == "🔬 S-Box Testing":
                 "overall_score": overall_score,
                 "grade": grade
             }, indent=4)
-            st.download_button("📋 JSON", json_data, f"{sbox_name}_results.json", "application/json", use_column_width=True)
+            st.download_button("📋 JSON", json_data, f"{sbox_name}_results.json", "application/json")
 
         with c3:
             report = f"S-BOX REPORT\n{'='*40}\nS-Box: {sbox_name}\nScore: {overall_score:.2f}%\nGrade: {grade}\n\n"
             for _, r in df.iterrows():
                 report += f"{r['Metric']} → {r['Status']} ({r['Score']})\n"
-            st.download_button("📝 TXT", report, f"{sbox_name}_report.txt", "text/plain", use_column_width=True)
+            st.download_button("📝 TXT", report, f"{sbox_name}_report.txt", "text/plain")
 
 
 # Page: Statistics
@@ -1564,7 +1559,7 @@ elif page == "📈 Statistics":
         
         with tab1:
             stats_df = pd.DataFrame(stats).T
-            st.dataframe(stats_df.style.format("{:.6f}"), use_column_width=True)
+            st.dataframe(stats_df.style.format("{:.6f}"))
             
             # Download statistics
             csv_buffer = io.StringIO()

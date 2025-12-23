@@ -290,7 +290,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown('<div class="img-container">', unsafe_allow_html=True)
-            st.image(img_np, use_column_width=True)
+            st.image(img_np)
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -372,7 +372,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
             
             with col1:
                 st.markdown('<div class="img-container">', unsafe_allow_html=True)
-                st.image(st.session_state.encrypted_image, use_column_width=True)
+                st.image(st.session_state.encrypted_image)
                 st.markdown('</div>', unsafe_allow_html=True)
             
             with col2:
@@ -435,7 +435,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
             
             with col1:
                 st.markdown('<div class="img-container">', unsafe_allow_html=True)
-                st.image(st.session_state.decrypted_image, use_column_width=True)
+                st.image(st.session_state.decrypted_image)
                 st.markdown('</div>', unsafe_allow_html=True)
             
             with col2:
