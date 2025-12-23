@@ -25,7 +25,11 @@ from sbox_utils import (
     lap,
     dap,
     bic_sac_fast,
-    bic_nl_fast 
+    bic_nl_fast,
+    differential_uniformity,
+    algebraic_degree,
+    transparency_order,
+    correlation_immunity
 )
 
 
@@ -381,10 +385,12 @@ def load_all_metrics_json():
 
 @st.cache_data
 def calculate_and_cache_all_metrics(sbox_array, name):
-    """Fallback: Hitung manual 8 metrik jika tidak ada di JSON"""
+    """Fallback: Hitung manual 12 metrik jika tidak ada di JSON"""
     from sbox_utils import (
         balance, bijective, nonlinearity, sac, 
-        bic_sac_fast, bic_nl_fast, lap, dap
+        bic_sac_fast, bic_nl_fast, lap, dap,
+        differential_uniformity, algebraic_degree,
+        transparency_order, correlation_immunity
     )
     
     # Pastikan sbox dalam bentuk flat 256 elemen
@@ -398,7 +404,11 @@ def calculate_and_cache_all_metrics(sbox_array, name):
         "BIC-SAC": bic_sac_fast(s_flat),
         "BIC-NL": bic_nl_fast(s_flat),
         "LAP": lap(s_flat),
-        "DAP": dap(s_flat)
+        "DAP": dap(s_flat),
+        "DU": differential_uniformity(s_flat),
+        "AD": algebraic_degree(s_flat),
+        "TO": transparency_order(s_flat),
+        "CI": correlation_immunity(s_flat, max_order=3)
     }
 
 def get_sbox_metrics_smart(sbox_name, sbox_array):
@@ -420,7 +430,7 @@ def get_sbox_hash(sbox):
     return hashlib.md5(sbox.tobytes()).hexdigest()
 
 def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
-    """Hitung metrics S-box dengan caching"""
+    """Hitung metrics S-box dengan caching - SEMUA 12 METRIK"""
     if not force_recalculate and sbox_name and sbox_name in st.session_state.metrics_by_name:
         return st.session_state.metrics_by_name[sbox_name], True
     
@@ -436,7 +446,11 @@ def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
         "LAP": lap(sbox),
         "DAP": dap(sbox),
         "BIC-SAC": bic_sac_fast(sbox),
-        "BIC-NL": bic_nl_fast(sbox)
+        "BIC-NL": bic_nl_fast(sbox),
+        "DU": differential_uniformity(sbox),
+        "AD": algebraic_degree(sbox),
+        "TO": transparency_order(sbox),
+        "CI": correlation_immunity(sbox, max_order=3)
     }
     
     metrics_serializable = {}
@@ -611,11 +625,12 @@ def display_metrics(metrics, from_cache=False):
                 st.progress(min(max(progress, 0.0), 1.0))
                 st.write(f"{value}")
 
-def display_metrics_8_lengkap(res):
-    """Fungsi baru untuk menampilkan 8 metrik secara mendetail (Versi Upgrade)"""
+def display_metrics_12_lengkap(res):
+    """Fungsi baru untuk menampilkan 12 metrik secara mendetail (Versi Upgrade dengan DU, AD, TO, CI)"""
     st.markdown("#### 📊 Ringkasan Metrik S-Box")
+    
+    # Baris pertama: 4 metrik utama
     m1, m2, m3, m4 = st.columns(4)
-    # Mengambil data dengan fallback jika nama kunci berbeda
     nl_val = res.get("Nonlinearity") or res.get("NL", "N/A")
     sac_val = res.get("SAC", 0)
     bic_nl = res.get("BIC-NL", "N/A")
@@ -625,12 +640,24 @@ def display_metrics_8_lengkap(res):
     m2.metric("SAC", f"{sac_val:.4f}")
     m3.metric("BIC-NL", bic_nl)
     m4.metric("BIC-SAC", f"{bic_sac:.4f}")
+    
+    # Baris kedua: 4 metrik tambahan
+    m5, m6, m7, m8 = st.columns(4)
+    du_val = res.get("DU", "N/A")
+    ad_val = res.get("AD", "N/A")
+    to_val = res.get("TO", 0)
+    ci_val = res.get("CI", "N/A")
+    
+    m5.metric("DU", du_val, help="Differential Uniformity (≤4 sangat baik)")
+    m6.metric("AD", ad_val, help="Algebraic Degree (=7 optimal)")
+    m7.metric("TO", f"{to_val:.4f}", help="Transparency Order (lebih rendah lebih baik)")
+    m8.metric("CI", ci_val, help="Correlation Immunity (0-3)")
 
-    with st.expander("🔍 Detail Hasil Pengujian Lengkap"):
-        col_a, col_b = st.columns(2)
+    with st.expander("🔍 Detail Hasil Pengujian Lengkap (12 Metrik)"):
+        col_a, col_b, col_c = st.columns(3)
         with col_a:
-            st.write(f"**⚖️ Balance State:** {'✅ Pass' if res.get('Balance') else '❌ Fail'}")
-            st.write(f"**🔄 Bijective State:** {'✅ Pass' if res.get('Bijective') else '❌ Fail'}")
+            st.write("**⚖️ Balance:**", '✅ Pass' if res.get('Balance') else '❌ Fail')
+            st.write("**🔄 Bijective:**", '✅ Pass' if res.get('Bijective') else '❌ Fail')
             st.write(f"**📈 Nonlinearity:** {nl_val}")
             st.write(f"**🎯 SAC:** {sac_val:.6f}")
         with col_b:
@@ -638,6 +665,11 @@ def display_metrics_8_lengkap(res):
             st.write(f"**🧩 BIC-NL:** {bic_nl}")
             st.write(f"**📉 LAP:** {res.get('LAP', 0):.6f}")
             st.write(f"**📊 DAP:** {res.get('DAP', 0):.6f}")
+        with col_c:
+            st.write(f"**🔢 DU:** {du_val}")
+            st.write(f"**🧮 AD:** {ad_val}")
+            st.write(f"**🔬 TO:** {to_val:.6f}")
+            st.write(f"**🛡️ CI:** {ci_val}")
 
 # Load metrics on startup
 if 'metrics_loaded' not in st.session_state:
@@ -1077,15 +1109,19 @@ elif page == "📊 S-Box Comparison":
             st.markdown("---")
             
             # Format and display main table
-            st.markdown("#### 🏆 Complete Comparison Table (Ranked)")
+            st.markdown("#### 🏆 Complete Comparison Table (Ranked) - All 12 Metrics")
             st.dataframe(df.style.format({
                 'Overall Score': '{:.2f}',
-                'NL': '{:.2f}',
+                'NL': '{:.0f}',
                 'SAC': '{:.4f}',
                 'LAP': '{:.6f}',
                 'DAP': '{:.6f}',
                 'BIC-SAC': '{:.4f}',
-                'BIC-NL': '{:.2f}'
+                'BIC-NL': '{:.0f}',
+                'DU': '{:.0f}',
+                'AD': '{:.0f}',
+                'TO': '{:.6f}',
+                'CI': '{:.0f}'
             }).background_gradient(subset=['Overall Score'], cmap='RdYlGn'), 
             use_container_width=True,
             height=400)

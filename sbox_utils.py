@@ -174,7 +174,7 @@ def fwht(a):
     return a
 
 # =====================================================
-# METRICS
+# EXISTING METRICS
 # =====================================================
 def balance(s):
     return all(np.sum((s >> b) & 1) == 128 for b in range(8))
@@ -240,13 +240,141 @@ def bic_nl_fast(s):
     return 128 - max_bias
 
 # =====================================================
+# NEW METRICS: DU, AD, TO, CI
+# =====================================================
+
+def differential_uniformity(s):
+    """
+    Differential Uniformity (DU)
+    Menghitung nilai δ maksimum dalam Difference Distribution Table (DDT)
+    DU = max_{Δx≠0, Δy} |{x : S(x) ⊕ S(x ⊕ Δx) = Δy}|
+    
+    Nilai yang lebih kecil = lebih baik (lebih tahan differential cryptanalysis)
+    Untuk S-box 8-bit yang baik: DU ≤ 4
+    AES S-box memiliki DU = 4
+    """
+    du = 0
+    for dx in range(1, 256):  # dx ≠ 0
+        dy_counts = np.bincount(s ^ s[np.arange(256) ^ dx], minlength=256)
+        du = max(du, np.max(dy_counts))
+    return int(du)
+
+
+def algebraic_degree(s):
+    """
+    Algebraic Degree (AD)
+    Menghitung derajat maksimum dari representasi aljabar boolean S-box
+    Menggunakan ANF (Algebraic Normal Form) melalui Möbius transform
+    
+    Nilai yang lebih tinggi = lebih baik (lebih tahan algebraic attack)
+    Untuk S-box 8-bit: AD maksimum = 7
+    AES S-box memiliki AD = 7
+    """
+    max_degree = 0
+    
+    for bit_pos in range(8):
+        # Ekstrak bit output tertentu untuk semua input
+        truth_table = np.array([(s[x] >> bit_pos) & 1 for x in range(256)], dtype=np.int32)
+        
+        # Möbius transform untuk mendapatkan ANF
+        anf = truth_table.copy()
+        for i in range(8):
+            for j in range(256):
+                if j & (1 << i):
+                    anf[j] ^= anf[j ^ (1 << i)]
+        
+        # Hitung derajat: jumlah bit 1 dalam indeks dengan koefisien ANF = 1
+        for idx in range(256):
+            if anf[idx]:
+                degree = bin(idx).count('1')
+                max_degree = max(max_degree, degree)
+    
+    return int(max_degree)
+
+
+def transparency_order(s):
+    """
+    Transparency Order (TO)
+    Mengukur resistensi terhadap differential power analysis (DPA)
+    TO yang lebih tinggi = lebih tahan terhadap side-channel attacks
+    
+    TO didefinisikan sebagai ukuran ketidakseimbangan dalam DDT
+    Dihitung menggunakan varian dari formula:
+    TO = Σ_{Δx≠0} max_{Δy} |{x : S(x) ⊕ S(x ⊕ Δx) = Δy}|
+    
+    Nilai yang lebih rendah = lebih baik (lebih uniform)
+    """
+    transparency_sum = 0
+    
+    for dx in range(1, 256):  # dx ≠ 0
+        dy_counts = np.bincount(s ^ s[np.arange(256) ^ dx], minlength=256)
+        transparency_sum += np.max(dy_counts)
+    
+    # Normalisasi
+    to_value = transparency_sum / (255 * 256)
+    return float(to_value)
+
+
+def correlation_immunity(s, max_order=3):
+    """
+    Correlation Immunity (CI)
+    Mengukur independensi output function dari subset input variables
+    
+    S-box bersifat correlation immune order k jika:
+    - Output tidak berkorelasi dengan kombinasi ≤ k input bits
+    
+    Kita menghitung CI untuk setiap output bit dan mengembalikan minimum order
+    
+    Nilai yang lebih tinggi = lebih baik (lebih tahan correlation attacks)
+    Untuk S-box 8-bit praktis: CI biasanya 0-3
+    
+    Note: Perhitungan penuh CI sangat mahal komputasi,
+    ini adalah versi praktis dengan max_order limit
+    """
+    min_ci_order = max_order
+    
+    for bit_pos in range(8):
+        # Ekstrak bit output tertentu
+        f = np.array([1 - 2*((s[x] >> bit_pos) & 1) for x in range(256)], dtype=np.int32)
+        
+        # Walsh-Hadamard transform
+        W = fwht(f.copy())
+        
+        ci_order = 0
+        # Cek order dari 1 hingga max_order
+        for order in range(1, max_order + 1):
+            # Cek semua kombinasi dengan Hamming weight = order
+            immune_at_order = True
+            for idx in range(256):
+                if bin(idx).count('1') == order:
+                    if W[idx] != 0:
+                        immune_at_order = False
+                        break
+            
+            if immune_at_order:
+                ci_order = order
+            else:
+                break
+        
+        min_ci_order = min(min_ci_order, ci_order)
+    
+    return int(min_ci_order)
+
+
+# =====================================================
 # MAIN
 # =====================================================
 if __name__ == "__main__":
     sboxes = generate_sboxes(include_random=True, seed=42)
     results = []
 
+    print("\n" + "="*70)
+    print("PENGUJIAN S-BOX DENGAN METRIK TAMBAHAN (DU, AD, TO, CI)")
+    print("="*70)
+
     for name, s in sboxes.items():
+        print(f"\nMenghitung metrik untuk S-box: {name}...")
+        
         res = {
             "S-box": name,
             "Balance": balance(s),
@@ -256,17 +384,59 @@ if __name__ == "__main__":
             "LAP": lap(s),
             "DAP": dap(s),
             "BIC-SAC": bic_sac_fast(s),
-            "BIC-NL": float(bic_nl_fast(s))
+            "BIC-NL": float(bic_nl_fast(s)),
+            # Metrik baru
+            "DU": differential_uniformity(s),
+            "AD": algebraic_degree(s),
+            "TO": transparency_order(s),
+            "CI": correlation_immunity(s, max_order=3)
         }
 
         results.append(res)
 
-        print(f"\n===== HASIL UJI S-BOX {name} =====")
-        for k, v in res.items():
-            print(f"{k:10}: {v}")
+        print(f"\n{'='*60}")
+        print(f"HASIL UJI S-BOX: {name}")
+        print(f"{'='*60}")
+        print(f"{'Metrik':<15} {'Nilai':<20} {'Keterangan'}")
+        print(f"{'-'*60}")
+        
+        # Metrik dasar
+        print(f"{'Balance':<15} {str(res['Balance']):<20} {'Semua bit balanced' if res['Balance'] else 'Tidak balanced'}")
+        print(f"{'Bijective':<15} {str(res['Bijective']):<20} {'Permutasi valid' if res['Bijective'] else 'Bukan permutasi'}")
+        print(f"{'NL':<15} {res['NL']:<20} {'Nonlinearity (>100 baik)'}")
+        print(f"{'SAC':<15} {res['SAC']:.6f}{'':>14} {'~0.5 ideal'}")
+        print(f"{'LAP':<15} {res['LAP']:.6f}{'':>14} {'Mendekati 0 baik'}")
+        print(f"{'DAP':<15} {res['DAP']:.6f}{'':>14} {'Mendekati 0 baik'}")
+        print(f"{'BIC-SAC':<15} {res['BIC-SAC']:.6f}{'':>14} {'~0.5 ideal'}")
+        print(f"{'BIC-NL':<15} {res['BIC-NL']:<20} {'Nonlinearity BIC'}")
+        
+        # Metrik baru
+        print(f"\n{'METRIK TAMBAHAN':^60}")
+        print(f"{'-'*60}")
+        print(f"{'DU':<15} {res['DU']:<20} {'≤4 sangat baik (AES=4)'}")
+        print(f"{'AD':<15} {res['AD']:<20} {'=7 optimal untuk 8-bit'}")
+        print(f"{'TO':<15} {res['TO']:.6f}{'':>14} {'Lebih rendah lebih baik'}")
+        print(f"{'CI':<15} {res['CI']:<20} {'Order immunity (0-3)'}")
 
+    # Simpan hasil
     with open("all_sbox_results.json", "w") as f:
         json.dump(results, f, indent=4)
 
-    print("\n✅ Semua hasil disimpan ke all_sbox_results.json")
-
+    print("\n" + "="*70)
+    print("✅ Semua hasil disimpan ke all_sbox_results.json")
+    print("="*70)
+    
+    # Tabel perbandingan lengkap
+    print("\n" + "="*120)
+    print("TABEL PERBANDINGAN S-BOX - SEMUA METRIK")
+    print("="*120)
+    print(f"{'S-Box':<10} {'Bal':<5} {'Bij':<5} {'NL':<5} {'SAC':<8} {'LAP':<8} {'DAP':<8} "
+          f"{'BIC-SAC':<8} {'BIC-NL':<7} {'DU':<4} {'AD':<4} {'TO':<8} {'CI':<4}")
+    print("-"*120)
+    for res in results:
+        bal = 'T' if res['Balance'] else 'F'
+        bij = 'T' if res['Bijective'] else 'F'
+        print(f"{res['S-box']:<10} {bal:<5} {bij:<5} {res['NL']:<5} {res['SAC']:<8.4f} "
+              f"{res['LAP']:<8.6f} {res['DAP']:<8.6f} {res['BIC-SAC']:<8.4f} "
+              f"{res['BIC-NL']:<7.0f} {res['DU']:<4} {res['AD']:<4} {res['TO']:<8.4f} {res['CI']:<4}")
+    print("="*120)
