@@ -329,7 +329,11 @@ def load_metrics_from_file():
             with open(METRICS_FILE, 'r') as f:
                 data = json.load(f)
                 
-                st.session_state.metrics_by_name = data
+                # Convert list of dicts to dict keyed by S-box name
+                if isinstance(data, list):
+                    st.session_state.metrics_by_name = {item.get('S-box', str(i)): item for i, item in enumerate(data)}
+                else:
+                    st.session_state.metrics_by_name = data
                 
                 # Build hash-based cache
                 sboxes = generate_sboxes(include_random=False)

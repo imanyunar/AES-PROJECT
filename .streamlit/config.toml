@@ -22,8 +22,4 @@ showErrorDetails = true
 [runner]
 # Allow long-running calculations
 magicEnabled = true
-installTracer = false
-fixMatplotlib = true
-
-# IMPORTANT: Increase execution timeout
 fastReruns = true
