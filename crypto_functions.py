@@ -182,15 +182,15 @@ def image_encrypt_ui(active_sbox, sbox_choice):
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.image(img_np, caption="📷 Original", use_container_width=True)
+            st.image(img_np, caption="📷 Original", use_column_width=True)
             st.caption(f"Size: {img_np.shape[1]}x{img_np.shape[0]}")
         
         with col2:
-            st.image(encrypted, caption="🔒 Encrypted", use_container_width=True)
+            st.image(encrypted, caption="🔒 Encrypted", use_column_width=True)
             st.caption(f"S-box: {sbox_choice}")
         
         with col3:
-            st.image(decrypted, caption="🔓 Decrypted", use_container_width=True)
+            st.image(decrypted, caption="🔓 Decrypted", use_column_width=True)
             # Check if decryption is perfect
             is_perfect = validate_pixel_perfect(img_np, decrypted)
             if is_perfect:
@@ -423,22 +423,22 @@ def image_comparison_page(sboxes):
         # Quick select buttons
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("✅ Select All", use_container_width=True):
+            if st.button("✅ Select All", use_column_width=True):
                 st.session_state.text_sbox_select = text_sboxes
                 st.session_state.image_sbox_select = image_sboxes
                 st.rerun()
         with col2:
-            if st.button("📝 Text Only", use_container_width=True):
+            if st.button("📝 Text Only", use_column_width=True):
                 st.session_state.text_sbox_select = text_sboxes
                 st.session_state.image_sbox_select = []
                 st.rerun()
         with col3:
-            if st.button("🖼️ Image Only", use_container_width=True):
+            if st.button("🖼️ Image Only", use_column_width=True):
                 st.session_state.text_sbox_select = []
                 st.session_state.image_sbox_select = image_sboxes
                 st.rerun()
         with col4:
-            if st.button("❌ Clear All", use_container_width=True):
+            if st.button("❌ Clear All", use_column_width=True):
                 st.session_state.text_sbox_select = []
                 st.session_state.image_sbox_select = []
                 st.rerun()
@@ -449,7 +449,7 @@ def image_comparison_page(sboxes):
         
         st.info(f"📊 Ready to compare **{len(selected_sboxes)}** S-boxes: {len(selected_text)} text + {len(selected_image)} image")
 
-        if st.button("🔬 Run Comparison", type="primary", use_container_width=True):
+        if st.button("🔬 Run Comparison", type="primary", use_column_width=True):
             results = []
             
             progress_bar = st.progress(0)
@@ -501,7 +501,7 @@ def image_comparison_page(sboxes):
             # Display results
             st.markdown("### 📊 Comparison Results")
             df = pd.DataFrame(results)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_column_width=True)
 
             # Separate analysis by type
             if len(selected_text) > 0 and len(selected_image) > 0:
@@ -512,7 +512,7 @@ def image_comparison_page(sboxes):
                 with tab1:
                     text_df = df[df['Type'] == '📝 Text']
                     if len(text_df) > 0:
-                        st.dataframe(text_df, use_container_width=True)
+                        st.dataframe(text_df, use_column_width=True)
                         st.caption(f"Average Entropy: {text_df['Entropy'].mean():.4f} | Average NPCR: {text_df['NPCR (%)'].mean():.2f}%")
                     else:
                         st.info("No text S-boxes selected")
@@ -520,7 +520,7 @@ def image_comparison_page(sboxes):
                 with tab2:
                     image_df = df[df['Type'] == '🖼️ Image']
                     if len(image_df) > 0:
-                        st.dataframe(image_df, use_container_width=True)
+                        st.dataframe(image_df, use_column_width=True)
                         st.caption(f"Average Entropy: {image_df['Entropy'].mean():.4f} | Average NPCR: {image_df['NPCR (%)'].mean():.2f}%")
                     else:
                         st.info("No image S-boxes selected")
