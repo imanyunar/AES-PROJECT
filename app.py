@@ -429,16 +429,14 @@ def get_sbox_hash(sbox):
     """Generate unique hash untuk S-box"""
     return hashlib.md5(sbox.tobytes()).hexdigest()
 
-def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
-    """Hitung metrics S-box dengan caching - SEMUA 12 METRIK"""
-    if not force_recalculate and sbox_name and sbox_name in st.session_state.metrics_by_name:
-        return st.session_state.metrics_by_name[sbox_name], True
-    
-    sbox_hash = get_sbox_hash(sbox)
-    if not force_recalculate and sbox_hash in st.session_state.metrics_cache:
-        return st.session_state.metrics_cache[sbox_hash], True
-    
-    # Calculate ALL 12 metrics (TAMBAHKAN 4 METRIK BARU)
+def sbox_metrics(sbox, sbox_name="default", force_recalculate=False):
+
+    if "metrics_by_name" not in st.session_state:
+        st.session_state.metrics_by_name = {}
+
+    if not force_recalculate and sbox_name in st.session_state.metrics_by_name:
+        return st.session_state.metrics_by_name[sbox_name], False
+
     metrics = {
         "Balance": balance(sbox),
         "Bijective": bijective(sbox),
@@ -448,27 +446,21 @@ def sbox_metrics(sbox, sbox_name=None, force_recalculate=False):
         "DAP": dap(sbox),
         "BIC-SAC": bic_sac_fast(sbox),
         "BIC-NL": bic_nl_fast(sbox),
-        "DU": differential_uniformity(sbox),      # BARU
-        "AD": algebraic_degree(sbox),             # BARU
-        "TO": transparency_order(sbox),           # BARU
-        "CI": correlation_immunity(sbox, max_order=3)  # BARU
+        "DU": differential_uniformity(sbox),
+        "AD": algebraic_degree(sbox),
+        "TO": transparency_order(sbox),
+        "CI": correlation_immunity(sbox, max_order=3)
     }
-    
-    # Convert numpy types to Python native types
-    metrics_serializable = {}
-    for key, value in metrics.items():
-        if isinstance(value, (np.integer, np.floating)):
-            metrics_serializable[key] = float(value)
-        elif isinstance(value, np.bool_):
-            metrics_serializable[key] = bool(value)
-        else:
-            metrics_serializable[key] = value
-    
-    st.session_state.metrics_cache[sbox_hash] = metrics_serializable
-    if sbox_name:
-        st.session_state.metrics_by_name[sbox_name] = metrics_serializable
-    
-    return metrics_serializable, False
+
+    metrics_serializable = {
+        k: float(v) if isinstance(v, (np.integer, np.floating)) else bool(v) if isinstance(v, np.bool_) else v
+        for k, v in metrics.items()
+    }
+
+    st.session_state.metrics_by_name[sbox_name] = metrics_serializable
+
+    return metrics_serializable, True
+
 def display_metrics_12_complete(metrics, from_cache=False):
     """Display ALL 12 metrics in organized format"""
     if from_cache:
