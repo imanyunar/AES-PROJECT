@@ -453,12 +453,22 @@ def sbox_metrics(sbox, sbox_name="default", force_recalculate=False):
     }
 
     # convert numpy → python native
-    metrics_serializable = {
-        k: float(v) if isinstance(v, (np.integer, np.floating))
-        else bool(v) if isinstance(v, np.bool_)
-        else v
-        for k, v in metrics.items()
-    }
+    if isinstance(metrics, dict):
+        metrics_serializable = {
+            k: float(v) if isinstance(v, (np.integer, np.floating))
+            else bool(v) if isinstance(v, np.bool_)
+            else v
+            for k, v in metrics.items()
+        }
+    elif isinstance(metrics, list):
+        metrics_serializable = [
+            float(v) if isinstance(v, (np.integer, np.floating))
+            else bool(v) if isinstance(v, np.bool_)
+            else v
+            for v in metrics
+        ]
+    else:
+        raise TypeError("Unsupported type for metrics: must be dict or list")
 
     st.session_state.metrics_by_name[sbox_name] = metrics_serializable
 
