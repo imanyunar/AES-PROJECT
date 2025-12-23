@@ -470,6 +470,10 @@ def sbox_metrics(sbox, sbox_name="default", force_recalculate=False):
     else:
         raise TypeError("Unsupported type for metrics: must be dict or list")
 
+    if isinstance(metrics_serializable, list):
+        # Convert list to dictionary using indices as keys
+        metrics_serializable = {str(i): v for i, v in enumerate(metrics_serializable)}
+
     st.session_state.metrics_by_name[sbox_name] = metrics_serializable
 
     return metrics_serializable, True
