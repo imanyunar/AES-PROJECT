@@ -302,7 +302,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
             st.markdown("### Encrypt Image")
             st.write("Transform your image into an encrypted format using the selected S-box.")
             
-            if st.button("🔒 Start Encryption", use_column_width=True, type="primary", key="encrypt_image_btn"):
+            if st.button("🔒 Start Encryption", type="primary", key="encrypt_image_btn"):
                 with st.spinner("🔄 Encrypting image... Please wait"):
                     encrypted = encrypt_image_new(img_np, active_sbox, key_input)
                     st.session_state.encrypted_image = encrypted
@@ -325,7 +325,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
             else:
                 st.write("Decrypt the uploaded image (treat as ciphertext).")
             
-            if st.button("🔓 Start Decryption", use_column_width=True, type="primary", key="decrypt_image_btn"):
+            if st.button("🔓 Start Decryption", type="primary", key="decrypt_image_btn"):
                 # Tentukan source untuk decrypt
                 if has_encrypted_in_session:
                     source_for_decrypt = st.session_state.encrypted_image
@@ -350,7 +350,7 @@ def image_encrypt_ui_new(active_sbox, sbox_choice):
             st.markdown("### Clear All Results")
             st.write("Remove all encrypted and decrypted images from the session.")
             
-            if st.button("🗑️ Clear Everything", use_column_width=True, key="clear_all_images"):
+            if st.button("🗑️ Clear Everything", key="clear_all_images"):
                 st.session_state.encrypted_image = None
                 st.session_state.decrypted_image = None
                 st.session_state.show_encrypted_image = False

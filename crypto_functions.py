@@ -423,22 +423,22 @@ def image_comparison_page(sboxes):
         # Quick select buttons
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            if st.button("✅ Select All", use_column_width=True):
+            if st.button("✅ Select All"):
                 st.session_state.text_sbox_select = text_sboxes
                 st.session_state.image_sbox_select = image_sboxes
                 st.rerun()
         with col2:
-            if st.button("📝 Text Only", use_column_width=True):
+            if st.button("📝 Text Only"):
                 st.session_state.text_sbox_select = text_sboxes
                 st.session_state.image_sbox_select = []
                 st.rerun()
         with col3:
-            if st.button("🖼️ Image Only", use_column_width=True):
+            if st.button("🖼️ Image Only"):
                 st.session_state.text_sbox_select = []
                 st.session_state.image_sbox_select = image_sboxes
                 st.rerun()
         with col4:
-            if st.button("❌ Clear All", use_column_width=True):
+            if st.button("❌ Clear All"):
                 st.session_state.text_sbox_select = []
                 st.session_state.image_sbox_select = []
                 st.rerun()
@@ -449,7 +449,7 @@ def image_comparison_page(sboxes):
         
         st.info(f"📊 Ready to compare **{len(selected_sboxes)}** S-boxes: {len(selected_text)} text + {len(selected_image)} image")
 
-        if st.button("🔬 Run Comparison", type="primary", use_column_width=True):
+        if st.button("🔬 Run Comparison", type="primary"):
             results = []
             
             progress_bar = st.progress(0)

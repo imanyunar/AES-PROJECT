@@ -817,7 +817,7 @@ if page == "🏠 Home - Encryption/Decryption":
             st.caption(f"**Size:** 256 bytes")
             st.caption(f"**Name:** {sbox_choice}")
         
-        if st.button("🔄 Recalculate Metrics", key="recalc_single", use_column_width=True):
+        if st.button("🔄 Recalculate Metrics", key="recalc_single"):
             if sbox_choice in sboxes:
                 with st.spinner("Recalculating..."):
                     active_sbox = sboxes[sbox_choice]
@@ -849,14 +849,14 @@ if page == "🏠 Home - Encryption/Decryption":
     elif sbox_choice == "RANDOM":
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🎲 Generate Random S-Box", use_column_width=True):
+            if st.button("🎲 Generate Random S-Box"):
                 active_sbox = np.array(random.sample(range(256), 256), dtype=np.uint8)
                 st.session_state.random_sbox = active_sbox
                 st.success("✅ Random S-box generated!")
                 st.balloons()
         with col2:
             if 'random_sbox' in st.session_state:
-                if st.button("🔄 Regenerate", use_column_width=True):
+                if st.button("🔄 Regenerate"):
                     active_sbox = np.array(random.sample(range(256), 256), dtype=np.uint8)
                     st.session_state.random_sbox = active_sbox
                     st.success("✅ Regenerated!")
@@ -880,7 +880,7 @@ if page == "🏠 Home - Encryption/Decryption":
         with col1:
             st.markdown(f"### 📊 S-Box Selected: **{sbox_choice}**")
         with col2:
-            if st.button("📈 Show Metrics", use_column_width=True, key="show_metrics_btn"):
+            if st.button("📈 Show Metrics", key="show_metrics_btn"):
                 st.session_state.show_sbox_metrics = True
         
         if st.session_state.get('show_sbox_metrics', False):
@@ -900,7 +900,7 @@ if page == "🏠 Home - Encryption/Decryption":
     if active_sbox is not None:
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("⬇️ Download S-Box CSV", use_column_width=True):
+            if st.button("⬇️ Download S-Box CSV"):
                 csv_buffer = io.StringIO()
                 writer = csv.writer(csv_buffer)
                 for val in active_sbox:
@@ -927,7 +927,7 @@ if page == "🏠 Home - Encryption/Decryption":
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔒 Encrypt", use_column_width=True, key="encrypt_text_btn"):
+        if st.button("🔒 Encrypt", key="encrypt_text_btn"):
             if active_sbox is not None:
                 try:
                     pt_bytes = parse_user_bytes(plaintext_input, length=16)
@@ -956,7 +956,7 @@ if page == "🏠 Home - Encryption/Decryption":
                 st.error("❌ Please select or define an S-box first")
     
     with col2:
-        if st.button("🔓 Decrypt", use_column_width=True, key="decrypt_text_btn"):
+        if st.button("🔓 Decrypt", key="decrypt_text_btn"):
             if active_sbox is not None:
                 try:
                     ct_bytes = parse_user_bytes(plaintext_input, length=16)
@@ -1082,7 +1082,7 @@ elif page == "📊 S-Box Comparison":
     with col3:
         st.write("")
         st.write("")
-        if st.button("🔄 Calculate", key="calc_single", use_column_width=True):
+        if st.button("🔄 Calculate", key="calc_single"):
             with st.spinner(f"Calculating {selected_sbox_recalc}..."):
                 sbox = sboxes[selected_sbox_recalc]
                 metrics, _ = sbox_metrics(sbox, sbox_name=selected_sbox_recalc, force_recalculate=True)
@@ -1093,7 +1093,7 @@ elif page == "📊 S-Box Comparison":
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("🔄 Recalculate ALL S-Boxes", key="calc_all", use_column_width=True):
+        if st.button("🔄 Recalculate ALL S-Boxes", key="calc_all"):
             total = len(sboxes)
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -1113,7 +1113,7 @@ elif page == "📊 S-Box Comparison":
             st.rerun()
     
     with col2:
-        if st.button("📊 Show Comparison Table", key="show_table", use_column_width=True):
+        if st.button("📊 Show Comparison Table", key="show_table"):
             st.session_state.show_comparison_results = True
             st.rerun()
     
@@ -1341,7 +1341,7 @@ elif page == "🔬 S-Box Testing":
     with col2:
         st.write("")
         st.write("")
-        test_button = st.button("🧪 Run Test", use_column_width=True)
+        test_button = st.button("🧪 Run Test")
 
     # ============================
     # RUN TEST
